@@ -8,19 +8,30 @@ autosave.
 ## Run locally
 
 ```bash
-npm install
-npm run dev
+./setup.sh
+./dev.sh
+```
+
+The development server defaults to `http://127.0.0.1:5173`. Override its
+address when needed:
+
+```bash
+HOST=0.0.0.0 PORT=3000 ./dev.sh
 ```
 
 ## Checks
 
 ```bash
-npm test
-npm run build
+./test.sh
+./build.sh
+./preview.sh
 ```
 
 The production build is written to `dist/` and uses relative asset paths so it
 can be hosted as a static site, including on GitHub Pages.
+
+All utility scripts live in the project root and can be invoked from any
+working directory.
 
 ## Current sprint
 
@@ -41,4 +52,3 @@ planned for Sprint 2.
 This is an unofficial planning tool. It does not validate official degree
 requirements. Students should confirm final plans with academic coordination or
 an advisor.
-
