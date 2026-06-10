@@ -1,0 +1,7 @@
+handoff-plangrid.md
+references/
+extra-info.md
+node_modules/
+dist/
+.vite/
+*.local
