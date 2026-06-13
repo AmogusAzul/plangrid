@@ -1,0 +1,17 @@
+{
+  "id": "blank-8-semesters",
+  "name": "Blank 8-semester plan",
+  "description": "Start with an empty standard-length plan.",
+  "creditLimitPerSemester": 21,
+  "semesters": [
+    { "label": "Semester 1", "termHint": "2026-20", "courseCodes": [] },
+    { "label": "Semester 2", "termHint": "2027-10", "courseCodes": [] },
+    { "label": "Semester 3", "termHint": "2027-20", "courseCodes": [] },
+    { "label": "Semester 4", "termHint": "2028-10", "courseCodes": [] },
+    { "label": "Semester 5", "termHint": "2028-20", "courseCodes": [] },
+    { "label": "Semester 6", "termHint": "2029-10", "courseCodes": [] },
+    { "label": "Semester 7", "termHint": "2029-20", "courseCodes": [] },
+    { "label": "Semester 8", "termHint": "2030-10", "courseCodes": [] }
+  ],
+  "storageCourseCodes": []
+}

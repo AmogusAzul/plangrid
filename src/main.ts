@@ -16,6 +16,10 @@ import {
   exportPlanFile,
   importPlanFile,
 } from "./export/csvExport";
+import {
+  loadPlanPreset,
+  planPresets,
+} from "./presets/planPresets";
 
 const root = document.querySelector<HTMLElement>("#app");
 
@@ -55,6 +59,18 @@ function render(): void {
       courseDestination = getDefaultCourseDestination(plan);
       render();
       return imported.fallbackCodes;
+    },
+    async loadPreset(presetId: string) {
+      const preset = planPresets.find((entry) => entry.id === presetId);
+      if (!preset) {
+        throw new Error("The selected preset is unavailable.");
+      }
+
+      const loaded = await loadPlanPreset(preset);
+      plan = savePlan(loaded.plan);
+      courseDestination = getDefaultCourseDestination(plan);
+      render();
+      return loaded.fallbackCodes;
     },
     setCourseDestination(destination) {
       courseDestination = normalizeCourseDestination(plan, destination);

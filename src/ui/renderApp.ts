@@ -2,6 +2,7 @@ import type { Course, PlannedCourse } from "../models/course";
 import type { CourseSearchState } from "../models/courseSearch";
 import type { StudyPlan } from "../models/studyPlan";
 import { mockCourses } from "../presets/mockCourses";
+import { planPresets } from "../presets/planPresets";
 import { STORAGE_DESTINATION } from "../state/courseDestination";
 import { addCourse, deleteCourse, moveCourse } from "../state/planCourses";
 import {
@@ -36,6 +37,7 @@ type AppActions = {
   exportPNG: (planner: HTMLElement, planName: string) => Promise<void>;
   exportPlan: () => void;
   importPlan: (file: File) => Promise<string[]>;
+  loadPreset: (presetId: string) => Promise<string[]>;
   setCourseDestination: (destination: string) => void;
   search: (query: string) => Promise<void>;
 };
@@ -262,6 +264,31 @@ export function renderApp(
           <p class="drag-hint">Drag any result directly into a semester or storage.</p>
           <div class="search-results" aria-live="polite">
             ${searchContent(search)}
+          </div>
+        </section>
+
+        <section class="panel presets-panel">
+          <div class="panel__heading">
+            <div>
+              <span class="eyebrow">Starting points</span>
+              <h2>Presets</h2>
+            </div>
+            <span class="count-badge">${planPresets.length}</span>
+          </div>
+          <div class="preset-list">
+            ${planPresets
+              .map(
+                (preset) => `
+                  <article class="preset-card">
+                    <div>
+                      <strong>${escapeHtml(preset.name)}</strong>
+                      <p>${escapeHtml(preset.description)}</p>
+                    </div>
+                    <button data-load-preset="${escapeHtml(preset.id)}">Use preset</button>
+                  </article>
+                `,
+              )
+              .join("")}
           </div>
         </section>
 
@@ -755,6 +782,43 @@ export function renderApp(
       const message =
         error instanceof Error ? error.message : "The plan file is invalid.";
       window.alert(`The plan could not be imported: ${message}`);
+    });
+  });
+
+  root.querySelectorAll<HTMLButtonElement>("[data-load-preset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const presetId = button.dataset.loadPreset;
+      if (
+        !presetId ||
+        !window.confirm(
+          "Load this preset and replace the current locally saved plan?",
+        )
+      ) {
+        return;
+      }
+
+      const presetButtons =
+        root.querySelectorAll<HTMLButtonElement>("[data-load-preset]");
+      presetButtons.forEach((entry) => {
+        entry.disabled = true;
+      });
+      button.textContent = "Loading...";
+
+      void actions.loadPreset(presetId).then((fallbackCodes) => {
+        if (fallbackCodes.length > 0) {
+          window.alert(
+            `Preset loaded. Metadata could not be fetched for: ${fallbackCodes.join(", ")}. Fallback credits were used.`,
+          );
+        }
+      }).catch((error: unknown) => {
+        presetButtons.forEach((entry) => {
+          entry.disabled = false;
+          entry.textContent = "Use preset";
+        });
+        const message =
+          error instanceof Error ? error.message : "The preset could not be loaded.";
+        window.alert(message);
+      });
     });
   });
 
