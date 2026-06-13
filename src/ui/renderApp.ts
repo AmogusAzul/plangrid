@@ -37,7 +37,7 @@ function courseCard(course: PlannedCourse, duplicatedCodes: Set<string>): string
   return `
     <article
       class="course-card"
-      style="--course-span: ${Math.max(1, course.credits)}; --course-color: ${palette.background}; --course-foreground: ${palette.foreground}"
+      style="--course-span: ${Math.max(1, course.credits)}; --course-color: ${palette.background}"
       data-course-id="${escapeHtml(course.id)}"
     >
       ${duplicateBadge}
