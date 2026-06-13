@@ -165,12 +165,12 @@ export function renderApp(
           <span>PlanGrid</span>
         </a>
         <div class="header-actions">
-          <span class="save-status">Saved locally</span>
+          <span class="save-status">Autosaved locally</span>
           <button class="button button--ghost" id="export-png">Export PNG</button>
           <button class="button button--ghost" id="export-plan">Export Plan</button>
           <button class="button button--ghost" id="import-plan">Import Plan</button>
           <input id="import-plan-file" type="file" accept=".plan,text/csv" hidden />
-          <button class="button button--ghost" id="reset-plan">Reset plan</button>
+          <button class="button button--ghost button--danger" id="reset-plan">Reset</button>
         </div>
       </header>
 
