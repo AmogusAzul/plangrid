@@ -1,35 +1,37 @@
-import { toPng } from 'html-to-image';
+import { toPng } from "html-to-image";
+import { downloadDataUrl, getFileName } from "./common";
 
-import { getFileName } from './common';
+type PngRenderer = typeof toPng;
 
-function downloadDataUrl(dataUrl: string, filename: string): void {
-  const link = document.createElement("a");
-  link.download = filename;
-  link.href = dataUrl;
-  link.click();
-}
+export type PngExportDependencies = {
+  render?: PngRenderer;
+  download?: typeof downloadDataUrl;
+  getStyle?: typeof getComputedStyle;
+  date?: Date;
+};
 
-export async function exportPlanPNG(rootClass : string, planName : string): Promise<void> {
-    const node: HTMLElement = document.getElementsByClassName(rootClass).item(0) as HTMLElement;
-
-    if (!(node instanceof HTMLElement)) {
-    throw new Error(`Element with id "${rootClass}" was not found or is not an HTMLElement.`);
-  }
-
-  const computedStyle = getComputedStyle(node);
-
+export async function exportPlanPNG(
+  node: HTMLElement,
+  planName: string,
+  dependencies: PngExportDependencies = {},
+): Promise<void> {
+  const render = dependencies.render ?? toPng;
+  const download = dependencies.download ?? downloadDataUrl;
+  const getStyle = dependencies.getStyle ?? getComputedStyle;
+  const computedStyle = getStyle(node);
   const width = node.scrollWidth;
   const height = node.scrollHeight;
+  const backgroundColor =
+    computedStyle.backgroundColor === "rgba(0, 0, 0, 0)"
+      ? "#ffffff"
+      : computedStyle.backgroundColor;
 
-  const dataUrl = await toPng(node, {
+  const dataUrl = await render(node, {
     cacheBust: true,
     pixelRatio: 2,
     width,
     height,
-    backgroundColor:
-      computedStyle.backgroundColor === "rgba(0, 0, 0, 0)"
-        ? "#ffffff"
-        : computedStyle.backgroundColor,
+    backgroundColor,
     style: {
       width: `${width}px`,
       height: `${height}px`,
@@ -39,5 +41,8 @@ export async function exportPlanPNG(rootClass : string, planName : string): Prom
     },
   });
 
-  downloadDataUrl(dataUrl, getFileName(planName)+".png");
+  download(
+    dataUrl,
+    `${getFileName(planName, dependencies.date)}.png`,
+  );
 }

@@ -1,13 +1,39 @@
-export function getFileName(planName : string): string {
+export function getFileName(
+  planName: string,
+  date = new Date(),
+): string {
+  const safeName = planName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "plangrid-plan";
+  const dateText = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
 
-    const date: Date = new Date();
+  return `${safeName}-${dateText}`;
+}
 
-    const year: number = date.getFullYear();
-    // getMonth() is 0-indexed (0 = January), so add 1
-    const month: string = String(date.getMonth() + 1).padStart(2, '0');
-    const day: string = String(date.getDate()).padStart(2, '0');
+export function downloadDataUrl(dataUrl: string, filename: string): void {
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = dataUrl;
+  link.click();
+}
 
-    const customDateStr: string = `${year}-${month}-${day}`;
+export function downloadTextFile(
+  text: string,
+  filename: string,
+  mimeType = "text/plain;charset=utf-8",
+): void {
+  const url = URL.createObjectURL(new Blob([text], { type: mimeType }));
 
-    return planName+"-"+customDateStr;
+  try {
+    downloadDataUrl(url, filename);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
