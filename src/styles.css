@@ -181,13 +181,34 @@ button {
 }
 
 .field select,
+.field input,
 .course-search input,
-.plan-stats input {
+.semester-term {
   border: 1px solid #ccd5ca;
   border-radius: 8px;
   padding: 8px 10px;
   color: #1c2c22;
   background: white;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(90px, 0.55fr);
+  gap: 0 10px;
+}
+
+.settings-grid .field {
+  min-width: 0;
+}
+
+.settings-grid input {
+  min-width: 0;
+}
+
+.settings-hint {
+  margin: -2px 0 0;
+  color: #7a867e;
+  font-size: 10px;
 }
 
 .catalog-list,
@@ -431,8 +452,7 @@ button {
   gap: 10px;
 }
 
-.plan-stats div,
-.plan-stats label {
+.plan-stats div {
   display: grid;
   min-width: 108px;
   gap: 2px;
@@ -450,11 +470,6 @@ button {
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-.plan-stats input {
-  width: 92px;
-  margin-top: 3px;
 }
 
 .semester-list {
@@ -487,12 +502,27 @@ button {
   background: rgba(246, 248, 244, 0.8);
 }
 
-.semester-meta > span {
-  margin-bottom: 5px;
+.semester-term {
+  width: 88px;
+  margin: 0 0 5px -7px;
+  border-color: transparent;
+  padding: 3px 6px;
   color: #748078;
+  background: transparent;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.05em;
+}
+
+.semester-term:hover,
+.semester-term:focus {
+  border-color: #b8c4b9;
+  outline: none;
+  background: white;
+}
+
+.semester-term:invalid {
+  border-color: #bd6b34;
 }
 
 .semester-meta h2 {

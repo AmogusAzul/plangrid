@@ -21,6 +21,57 @@ export function nextRegularTerm(term: string): string {
   return match[2] === "10" ? `${year}-20` : `${year + 1}-10`;
 }
 
+export function isRegularTerm(term: string): boolean {
+  return /^\d{4}-(10|20)$/.test(term);
+}
+
+export function cascadeSemesterTerms(
+  plan: StudyPlan,
+  startIndex: number,
+  firstTerm: string,
+): StudyPlan {
+  const term = firstTerm.trim();
+
+  if (!isRegularTerm(term)) {
+    throw new Error(`Invalid regular term: ${firstTerm}`);
+  }
+
+  if (startIndex < 0 || startIndex >= plan.semesters.length) {
+    return plan;
+  }
+
+  let nextTerm = term;
+  const semesters = plan.semesters.map((semester, index) => {
+    if (index < startIndex) {
+      return semester;
+    }
+
+    const updatedSemester = {
+      ...semester,
+      termHint: nextTerm,
+    };
+    nextTerm = nextRegularTerm(nextTerm);
+    return updatedSemester;
+  });
+
+  return {
+    ...plan,
+    semesters,
+  };
+}
+
+export function updateSemesterTerm(
+  plan: StudyPlan,
+  semesterId: string,
+  term: string,
+): StudyPlan {
+  const semesterIndex = plan.semesters.findIndex(
+    (semester) => semester.id === semesterId,
+  );
+
+  return cascadeSemesterTerms(plan, semesterIndex, term);
+}
+
 export function createSemesters(
   count: number,
   firstTerm = DEFAULT_FIRST_TERM,
@@ -103,4 +154,3 @@ export function resizeSemesters(
     storage: [...plan.storage, ...removedCourses],
   };
 }
-

@@ -4,7 +4,12 @@ import type { StudyPlan } from "../models/studyPlan";
 import { mockCourses } from "../presets/mockCourses";
 import { STORAGE_DESTINATION } from "../state/courseDestination";
 import { addCourse, deleteCourse, moveCourse } from "../state/planCourses";
-import { resizeSemesters } from "../state/planFactory";
+import {
+  cascadeSemesterTerms,
+  isRegularTerm,
+  resizeSemesters,
+  updateSemesterTerm,
+} from "../state/planFactory";
 import {
   getSemesterGridColumns,
   positionSemesterCourses,
@@ -255,6 +260,40 @@ export function renderApp(
             ${searchContent(search)}
           </div>
         </section>
+
+        <section class="panel settings-panel">
+          <div class="panel__heading">
+            <div>
+              <span class="eyebrow">Plan configuration</span>
+              <h2>Settings</h2>
+            </div>
+          </div>
+          <div class="settings-grid">
+            <label class="field">
+              <span>Plan name</span>
+              <input id="settings-plan-name" value="${escapeHtml(plan.name)}" />
+            </label>
+            <label class="field">
+              <span>Semesters</span>
+              <input id="settings-semester-count" type="number" min="1" max="16" value="${plan.semesters.length}" />
+            </label>
+            <label class="field">
+              <span>First term</span>
+              <input
+                id="settings-first-term"
+                value="${escapeHtml(plan.semesters[0]?.termHint ?? "")}"
+                pattern="\\d{4}-(10|20)"
+                placeholder="2025-10"
+                title="Use a regular term in YYYY-10 or YYYY-20 format"
+              />
+            </label>
+            <label class="field">
+              <span>Credit limit</span>
+              <input id="settings-credit-limit" type="number" min="1" max="30" value="${plan.creditLimitPerSemester}" />
+            </label>
+          </div>
+          <p class="settings-hint">Regular terms only: YYYY-10 or YYYY-20.</p>
+        </section>
       </aside>
 
       <main class="planner">
@@ -265,14 +304,8 @@ export function renderApp(
           </div>
           <div class="plan-stats">
             <div><strong>${getTotalPlanCredits(plan)}</strong><span>Total credits</span></div>
-            <label>
-              <span>Semesters</span>
-              <input id="semester-count" type="number" min="1" max="16" value="${plan.semesters.length}" />
-            </label>
-            <label>
-              <span>Credit limit</span>
-              <input id="credit-limit" type="number" min="1" max="30" value="${plan.creditLimitPerSemester}" />
-            </label>
+            <div><strong>${plan.semesters.length}</strong><span>Semesters</span></div>
+            <div><strong>${plan.creditLimitPerSemester}</strong><span>Credit limit</span></div>
           </div>
         </section>
 
@@ -298,7 +331,14 @@ export function renderApp(
               return `
                 <article class="semester-row ${hasWarning ? "semester-row--warning" : ""}">
                   <header class="semester-meta">
-                    <span>${escapeHtml(semester.termHint)}</span>
+                    <input
+                      class="semester-term"
+                      data-semester-term="${escapeHtml(semester.id)}"
+                      value="${escapeHtml(semester.termHint)}"
+                      pattern="\\d{4}-(10|20)"
+                      title="Use a regular term in YYYY-10 or YYYY-20 format"
+                      aria-label="${escapeHtml(semester.label)} term"
+                    />
                     <h2>${escapeHtml(semester.label)}</h2>
                     <strong>${credits} / ${plan.creditLimitPerSemester} credits${isOverloaded ? " !" : ""}</strong>
                     <div
@@ -351,17 +391,58 @@ export function renderApp(
     actions.updatePlan((current) => ({ ...current, name: name || "Untitled plan" }));
   });
 
-  root.querySelector<HTMLInputElement>("#semester-count")?.addEventListener("change", (event) => {
+  root.querySelector<HTMLInputElement>("#settings-plan-name")?.addEventListener("change", (event) => {
+    const name = (event.currentTarget as HTMLInputElement).value.trim();
+    actions.updatePlan((current) => ({ ...current, name: name || "Untitled plan" }));
+  });
+
+  root.querySelector<HTMLInputElement>("#settings-semester-count")?.addEventListener("change", (event) => {
     const count = Number((event.currentTarget as HTMLInputElement).value);
     actions.updatePlan((current) => resizeSemesters(current, count));
   });
 
-  root.querySelector<HTMLInputElement>("#credit-limit")?.addEventListener("change", (event) => {
+  root.querySelector<HTMLInputElement>("#settings-credit-limit")?.addEventListener("change", (event) => {
     const limit = Number((event.currentTarget as HTMLInputElement).value);
     actions.updatePlan((current) => ({
       ...current,
       creditLimitPerSemester: Math.min(30, Math.max(1, Math.trunc(limit))),
     }));
+  });
+
+  function updateTermInput(
+    input: HTMLInputElement,
+    update: (term: string) => void,
+  ): void {
+    const term = input.value.trim();
+
+    if (!isRegularTerm(term)) {
+      input.setCustomValidity("Use YYYY-10 or YYYY-20.");
+      input.reportValidity();
+      return;
+    }
+
+    input.setCustomValidity("");
+    update(term);
+  }
+
+  root.querySelector<HTMLInputElement>("#settings-first-term")?.addEventListener("change", (event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    updateTermInput(input, (term) => {
+      actions.updatePlan((current) => cascadeSemesterTerms(current, 0, term));
+    });
+  });
+
+  root.querySelectorAll<HTMLInputElement>("[data-semester-term]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const semesterId = input.dataset.semesterTerm;
+      if (!semesterId) return;
+
+      updateTermInput(input, (term) => {
+        actions.updatePlan((current) =>
+          updateSemesterTerm(current, semesterId, term),
+        );
+      });
+    });
   });
 
   root.querySelector<HTMLFormElement>("#course-search-form")?.addEventListener("submit", (event) => {
