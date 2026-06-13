@@ -72,35 +72,6 @@ button {
   letter-spacing: -0.04em;
 }
 
-.plan-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.plan-title label {
-  color: #adc0b3;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.plan-title input {
-  width: 300px;
-  border: 0;
-  border-bottom: 1px solid #577061;
-  padding: 8px 2px;
-  color: white;
-  outline: none;
-  background: transparent;
-  font-weight: 600;
-}
-
-.plan-title input:focus {
-  border-color: #b9e4a8;
-}
-
 .header-actions {
   display: flex;
   align-items: center;
@@ -151,7 +122,6 @@ button {
 }
 
 .panel h2,
-.planner h1,
 .semester-meta h2 {
   margin: 0;
   font-family: "Manrope", sans-serif;
@@ -182,33 +152,12 @@ button {
 
 .field select,
 .field input,
-.course-search input,
-.semester-term {
+.course-search input {
   border: 1px solid #ccd5ca;
   border-radius: 8px;
   padding: 8px 10px;
   color: #1c2c22;
   background: white;
-}
-
-.settings-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(90px, 0.55fr);
-  gap: 0 10px;
-}
-
-.settings-grid .field {
-  min-width: 0;
-}
-
-.settings-grid input {
-  min-width: 0;
-}
-
-.settings-hint {
-  margin: -2px 0 0;
-  color: #7a867e;
-  font-size: 10px;
 }
 
 .catalog-list,
@@ -440,10 +389,25 @@ button {
   margin-bottom: 24px;
 }
 
-.planner h1 {
+.roadmap-title {
+  display: grid;
+}
+
+.roadmap-title input {
+  width: min(430px, 40vw);
+  border: 0;
+  border-bottom: 2px solid #aebbad;
+  padding: 1px 0 4px;
   color: #17291e;
-  font-size: 30px;
+  outline: none;
+  background: transparent;
+  font: 800 30px "Manrope", sans-serif;
   letter-spacing: -0.035em;
+}
+
+.roadmap-title input:hover,
+.roadmap-title input:focus {
+  border-color: #50775a;
 }
 
 .plan-stats {
@@ -452,7 +416,8 @@ button {
   gap: 10px;
 }
 
-.plan-stats div {
+.plan-stats div,
+.plan-stats label {
   display: grid;
   min-width: 108px;
   gap: 2px;
@@ -470,6 +435,16 @@ button {
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.plan-stats input {
+  width: 92px;
+  margin-top: 3px;
+  border: 1px solid #ccd5ca;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #1c2c22;
+  background: white;
 }
 
 .semester-list {
@@ -503,25 +478,47 @@ button {
 }
 
 .semester-term {
-  width: 88px;
-  margin: 0 0 5px -7px;
-  border-color: transparent;
-  padding: 3px 6px;
+  margin-bottom: 5px;
   color: #748078;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.semester-term-editor {
+  display: grid;
+  width: 108px;
+  margin-bottom: 5px;
+}
+
+.semester-term-editor span {
+  color: #748078;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.semester-term-editor input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 0;
+  border-bottom: 1px solid #8d9b8f;
+  padding: 3px 1px;
+  color: #4f5d54;
+  outline: none;
   background: transparent;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.05em;
 }
 
-.semester-term:hover,
-.semester-term:focus {
-  border-color: #b8c4b9;
-  outline: none;
-  background: white;
+.semester-term-editor input:hover,
+.semester-term-editor input:focus {
+  border-color: #3f714b;
 }
 
-.semester-term:invalid {
+.semester-term-editor input:invalid {
   border-color: #bd6b34;
 }
 

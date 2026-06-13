@@ -8,7 +8,6 @@ import {
   cascadeSemesterTerms,
   isRegularTerm,
   resizeSemesters,
-  updateSemesterTerm,
 } from "../state/planFactory";
 import {
   getSemesterGridColumns,
@@ -158,10 +157,6 @@ export function renderApp(
           <span class="brand__mark">PG</span>
           <span>PlanGrid</span>
         </a>
-        <div class="plan-title">
-          <label for="plan-name">Plan name</label>
-          <input id="plan-name" value="${escapeHtml(plan.name)}" />
-        </div>
         <div class="header-actions">
           <span class="save-status">Saved locally</span>
           <button class="button button--ghost" id="reset-plan">Reset plan</button>
@@ -261,57 +256,30 @@ export function renderApp(
           </div>
         </section>
 
-        <section class="panel settings-panel">
-          <div class="panel__heading">
-            <div>
-              <span class="eyebrow">Plan configuration</span>
-              <h2>Settings</h2>
-            </div>
-          </div>
-          <div class="settings-grid">
-            <label class="field">
-              <span>Plan name</span>
-              <input id="settings-plan-name" value="${escapeHtml(plan.name)}" />
-            </label>
-            <label class="field">
-              <span>Semesters</span>
-              <input id="settings-semester-count" type="number" min="1" max="16" value="${plan.semesters.length}" />
-            </label>
-            <label class="field">
-              <span>First term</span>
-              <input
-                id="settings-first-term"
-                value="${escapeHtml(plan.semesters[0]?.termHint ?? "")}"
-                pattern="\\d{4}-(10|20)"
-                placeholder="2025-10"
-                title="Use a regular term in YYYY-10 or YYYY-20 format"
-              />
-            </label>
-            <label class="field">
-              <span>Credit limit</span>
-              <input id="settings-credit-limit" type="number" min="1" max="30" value="${plan.creditLimitPerSemester}" />
-            </label>
-          </div>
-          <p class="settings-hint">Regular terms only: YYYY-10 or YYYY-20.</p>
-        </section>
       </aside>
 
       <main class="planner">
         <section class="planner-toolbar">
-          <div>
-            <span class="eyebrow">Academic roadmap</span>
-            <h1>${escapeHtml(plan.name)}</h1>
-          </div>
+          <label class="roadmap-title" for="plan-name">
+            <span class="eyebrow">Academic roadmap - edit plan name</span>
+            <input id="plan-name" value="${escapeHtml(plan.name)}" aria-label="Plan name" />
+          </label>
           <div class="plan-stats">
             <div><strong>${getTotalPlanCredits(plan)}</strong><span>Total credits</span></div>
-            <div><strong>${plan.semesters.length}</strong><span>Semesters</span></div>
-            <div><strong>${plan.creditLimitPerSemester}</strong><span>Credit limit</span></div>
+            <label>
+              <span>Semesters</span>
+              <input id="semester-count" type="number" min="1" max="16" value="${plan.semesters.length}" />
+            </label>
+            <label>
+              <span>Credit limit</span>
+              <input id="credit-limit" type="number" min="1" max="30" value="${plan.creditLimitPerSemester}" />
+            </label>
           </div>
         </section>
 
         <section class="semester-list" aria-label="Study plan semesters">
           ${plan.semesters
-            .map((semester) => {
+            .map((semester, semesterIndex) => {
               const credits = sumCredits(semester.courses);
               const isOverloaded = overloadedSemesters.has(semester.id);
               const hasDuplicate = semester.courses.some((course) =>
@@ -331,14 +299,20 @@ export function renderApp(
               return `
                 <article class="semester-row ${hasWarning ? "semester-row--warning" : ""}">
                   <header class="semester-meta">
-                    <input
-                      class="semester-term"
-                      data-semester-term="${escapeHtml(semester.id)}"
-                      value="${escapeHtml(semester.termHint)}"
-                      pattern="\\d{4}-(10|20)"
-                      title="Use a regular term in YYYY-10 or YYYY-20 format"
-                      aria-label="${escapeHtml(semester.label)} term"
-                    />
+                    ${
+                      semesterIndex === 0
+                        ? `<label class="semester-term-editor">
+                            <span>Edit first period</span>
+                            <input
+                              id="first-semester-term"
+                              value="${escapeHtml(semester.termHint)}"
+                              pattern="\\d{4}-(10|20)"
+                              title="Use a regular term in YYYY-10 or YYYY-20 format"
+                              aria-label="First semester period"
+                            />
+                          </label>`
+                        : `<span class="semester-term">${escapeHtml(semester.termHint)}</span>`
+                    }
                     <h2>${escapeHtml(semester.label)}</h2>
                     <strong>${credits} / ${plan.creditLimitPerSemester} credits${isOverloaded ? " !" : ""}</strong>
                     <div
@@ -391,17 +365,12 @@ export function renderApp(
     actions.updatePlan((current) => ({ ...current, name: name || "Untitled plan" }));
   });
 
-  root.querySelector<HTMLInputElement>("#settings-plan-name")?.addEventListener("change", (event) => {
-    const name = (event.currentTarget as HTMLInputElement).value.trim();
-    actions.updatePlan((current) => ({ ...current, name: name || "Untitled plan" }));
-  });
-
-  root.querySelector<HTMLInputElement>("#settings-semester-count")?.addEventListener("change", (event) => {
+  root.querySelector<HTMLInputElement>("#semester-count")?.addEventListener("change", (event) => {
     const count = Number((event.currentTarget as HTMLInputElement).value);
     actions.updatePlan((current) => resizeSemesters(current, count));
   });
 
-  root.querySelector<HTMLInputElement>("#settings-credit-limit")?.addEventListener("change", (event) => {
+  root.querySelector<HTMLInputElement>("#credit-limit")?.addEventListener("change", (event) => {
     const limit = Number((event.currentTarget as HTMLInputElement).value);
     actions.updatePlan((current) => ({
       ...current,
@@ -425,23 +394,10 @@ export function renderApp(
     update(term);
   }
 
-  root.querySelector<HTMLInputElement>("#settings-first-term")?.addEventListener("change", (event) => {
+  root.querySelector<HTMLInputElement>("#first-semester-term")?.addEventListener("change", (event) => {
     const input = event.currentTarget as HTMLInputElement;
     updateTermInput(input, (term) => {
       actions.updatePlan((current) => cascadeSemesterTerms(current, 0, term));
-    });
-  });
-
-  root.querySelectorAll<HTMLInputElement>("[data-semester-term]").forEach((input) => {
-    input.addEventListener("change", () => {
-      const semesterId = input.dataset.semesterTerm;
-      if (!semesterId) return;
-
-      updateTermInput(input, (term) => {
-        actions.updatePlan((current) =>
-          updateSemesterTerm(current, semesterId, term),
-        );
-      });
     });
   });
 
