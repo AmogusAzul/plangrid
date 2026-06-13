@@ -11,7 +11,7 @@ import {
   sumCredits,
   validatePlan,
 } from "../validation/validatePlan";
-import { getCourseColor } from "./courseColor";
+import { getCourseColor, getCoursePalette } from "./courseColor";
 
 type AppActions = {
   updatePlan: (update: (plan: StudyPlan) => StudyPlan) => void;
@@ -29,6 +29,7 @@ function escapeHtml(value: string): string {
 }
 
 function courseCard(course: PlannedCourse, duplicatedCodes: Set<string>): string {
+  const palette = getCoursePalette(course);
   const duplicateBadge = duplicatedCodes.has(course.code)
     ? '<span class="course-card__warning" title="Duplicate course">!</span>'
     : "";
@@ -36,7 +37,7 @@ function courseCard(course: PlannedCourse, duplicatedCodes: Set<string>): string
   return `
     <article
       class="course-card"
-      style="--course-span: ${Math.max(1, course.credits)}; --course-color: ${getCourseColor(course)}"
+      style="--course-span: ${Math.max(1, course.credits)}; --course-color: ${palette.background}; --course-foreground: ${palette.foreground}"
       data-course-id="${escapeHtml(course.id)}"
     >
       ${duplicateBadge}

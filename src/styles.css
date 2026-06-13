@@ -529,7 +529,7 @@ button {
   overflow: hidden;
   border-radius: 9px;
   padding: 9px 10px;
-  color: white;
+  color: var(--course-foreground);
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.13), transparent 45%),
     var(--course-color);
@@ -578,8 +578,8 @@ button {
   border: 0;
   border-radius: 5px;
   padding: 3px 5px;
-  color: white;
-  background: rgba(0, 0, 0, 0.22);
+  color: var(--course-foreground);
+  background: color-mix(in srgb, var(--course-foreground), transparent 78%);
   font-size: 8px;
   opacity: 0;
   transition: opacity 120ms ease;

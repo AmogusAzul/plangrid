@@ -15,6 +15,9 @@ type FetchCourseApi = (
   init?: RequestInit,
 ) => Promise<Response>;
 
+const PAGE_SIZE = 25;
+const MAX_NAME_SEARCH_PAGES = 4;
+
 export class CourseApiError extends Error {
   constructor(message: string) {
     super(message);
@@ -80,7 +83,11 @@ export function normalizeCourseOfferings(rows: RawCourseOffering[]): Course[] {
   return [...courses.values()];
 }
 
-function createSearchUrl(input: string): URL {
+function formatNameQuery(query: string): string {
+  return query.trim().replace(/\s+/g, "%25");
+}
+
+function createSearchUrl(input: string, offset = 0): URL {
   const { prefix, query } = parseCourseSearchInput(input);
   const url = new URL(COURSE_API_URL);
   const parameters: Record<string, string> = {
@@ -88,12 +95,12 @@ function createSearchUrl(input: string): URL {
     ptrm: "",
     prefix,
     attr: "",
-    nameInput: query,
+    nameInput: prefix ? query : formatNameQuery(query),
     campus: "",
     attrs: "",
     timeStart: "",
-    offset: "0",
-    limit: "25",
+    offset: String(offset),
+    limit: String(PAGE_SIZE),
     courseQuotas: "",
     days: "",
     courseRestrictions: "",
@@ -108,27 +115,23 @@ function createSearchUrl(input: string): URL {
   return url;
 }
 
-export async function searchCourses(
-  query: string,
-  fetchApi: FetchCourseApi = fetch,
-): Promise<Course[]> {
-  if (!query.trim()) return [];
-
-  const controller = new AbortController();
-  const timeout = globalThis.setTimeout(() => controller.abort(), 12_000);
+async function fetchCoursePage(
+  input: string,
+  offset: number,
+  fetchApi: FetchCourseApi,
+  signal: AbortSignal,
+): Promise<RawCourseOffering[]> {
   let response: Response;
 
   try {
-    response = await fetchApi(createSearchUrl(query), {
+    response = await fetchApi(createSearchUrl(input, offset), {
       headers: { Accept: "application/json" },
-      signal: controller.signal,
+      signal,
     });
   } catch {
     throw new CourseApiError(
       "The Uniandes course service could not be reached.",
     );
-  } finally {
-    globalThis.clearTimeout(timeout);
   }
 
   if (!response.ok) {
@@ -153,7 +156,60 @@ export async function searchCourses(
     );
   }
 
-  return normalizeCourseOfferings(payload);
+  return payload;
+}
+
+function normalizeComparableText(value: string): string {
+  return value.trim().toLocaleUpperCase("es-CO");
+}
+
+function rankCourses(courses: Course[], input: string): Course[] {
+  const { prefix, query } = parseCourseSearchInput(input);
+  if (prefix) return courses;
+
+  const expectedTitle = normalizeComparableText(query);
+  return [...courses].sort((left, right) => {
+    const leftExact =
+      normalizeComparableText(left.name) === expectedTitle ? 0 : 1;
+    const rightExact =
+      normalizeComparableText(right.name) === expectedTitle ? 0 : 1;
+
+    return leftExact - rightExact || left.code.localeCompare(right.code);
+  });
+}
+
+export async function searchCourses(
+  query: string,
+  fetchApi: FetchCourseApi = fetch,
+): Promise<Course[]> {
+  if (!query.trim()) return [];
+
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), 12_000);
+  const parsedInput = parseCourseSearchInput(query);
+  const pageCount =
+    parsedInput.prefix || !parsedInput.query.includes(" ")
+      ? 1
+      : MAX_NAME_SEARCH_PAGES;
+  const rows: RawCourseOffering[] = [];
+
+  try {
+    for (let page = 0; page < pageCount; page += 1) {
+      const pageRows = await fetchCoursePage(
+        query,
+        page * PAGE_SIZE,
+        fetchApi,
+        controller.signal,
+      );
+      rows.push(...pageRows);
+
+      if (pageRows.length < PAGE_SIZE) break;
+    }
+  } finally {
+    globalThis.clearTimeout(timeout);
+  }
+
+  return rankCourses(normalizeCourseOfferings(rows), query);
 }
 
 export async function getCourseByCode(
