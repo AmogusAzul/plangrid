@@ -16,6 +16,7 @@ import { getCourseColor, getCoursePalette } from "./courseColor";
 type AppActions = {
   updatePlan: (update: (plan: StudyPlan) => StudyPlan) => void;
   resetPlan: () => void;
+  setCourseDestination: (destination: string) => void;
   search: (query: string) => Promise<void>;
 };
 
@@ -112,6 +113,7 @@ export function renderApp(
   root: HTMLElement,
   plan: StudyPlan,
   search: CourseSearchState,
+  courseDestination: string,
   actions: AppActions,
 ): void {
   const warnings = validatePlan(plan);
@@ -209,10 +211,10 @@ export function renderApp(
               ${plan.semesters
                 .map(
                   (semester) =>
-                    `<option value="${escapeHtml(semester.id)}">${escapeHtml(semester.label)}</option>`,
+                    `<option value="${escapeHtml(semester.id)}" ${semester.id === courseDestination ? "selected" : ""}>${escapeHtml(semester.label)}</option>`,
                 )
                 .join("")}
-              <option value="storage">Storage</option>
+              <option value="storage" ${courseDestination === "storage" ? "selected" : ""}>Storage</option>
             </select>
           </label>
           <div class="search-results" aria-live="polite">
@@ -303,6 +305,12 @@ export function renderApp(
     const formData = new FormData(form);
     const query = String(formData.get("query") ?? "");
     void actions.search(query);
+  });
+
+  root.querySelector<HTMLSelectElement>("#course-destination")?.addEventListener("change", (event) => {
+    actions.setCourseDestination(
+      (event.currentTarget as HTMLSelectElement).value,
+    );
   });
 
   const availableCourses = new Map(
