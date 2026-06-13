@@ -22,7 +22,7 @@ export const requirementCourses: Course[] = [
   {
     code: "EING-0000",
     name: "Electiva de Ingenieria",
-    credits: 3,
+    credits: 2,
     department: "EING",
   },
   {

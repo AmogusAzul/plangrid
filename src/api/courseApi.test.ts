@@ -130,6 +130,9 @@ describe("courseApi", () => {
     expect(searchRequirementCourses("creditos libre")).toEqual([
       expect.objectContaining({ code: "CLEX-0000" }),
     ]);
+    expect(searchRequirementCourses("EING")[0]).toEqual(
+      expect.objectContaining({ code: "EING-0000", credits: 2 }),
+    );
   });
 
   it("returns matching requirements even when the live API fails", async () => {
