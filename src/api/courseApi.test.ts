@@ -116,7 +116,7 @@ describe("courseApi", () => {
 
   it("searches local study-plan requirements by acronym and partial name", () => {
     expect(searchRequirementCourses("CBU")[0]).toEqual(
-      expect.objectContaining({ code: "CBUX-0000", credits: 2 }),
+      expect.objectContaining({ code: "CBUX-0000", credits: 3 }),
     );
     expect(searchRequirementCourses("EP")[0]).toEqual(
       expect.objectContaining({ code: "EPXX-0000" }),
@@ -146,7 +146,7 @@ describe("courseApi", () => {
     const fetchApi = vi.fn();
 
     await expect(getCourseByCode("CBUX-0000", fetchApi)).resolves.toEqual(
-      expect.objectContaining({ name: "CBU", credits: 2 }),
+      expect.objectContaining({ name: "CBU", credits: 3 }),
     );
     expect(fetchApi).not.toHaveBeenCalled();
   });
