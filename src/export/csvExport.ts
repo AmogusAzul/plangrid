@@ -3,18 +3,27 @@ import type { Course, PlannedCourse } from "../models/course";
 import type { StudyPlan } from "../models/studyPlan";
 import { createId, isRegularTerm } from "../state/planFactory";
 import {
+  hydrateCourses,
+  type CourseLookup,
+} from "../state/courseHydration";
+import {
   getSemesterGridColumns,
   positionSemesterCourses,
 } from "../state/semesterLayout";
 import { downloadTextFile, getFileName } from "./common";
 
-const FORMAT_VERSION = "1";
-const FALLBACK_CREDITS = 3;
+const FORMAT_VERSION = "2";
+const LEGACY_FORMAT_VERSION = "1";
 
-type CourseLookup = (code: string) => Promise<Course | null>;
+type CachedCourse = Course & {
+  metadataFallback?: boolean;
+};
 
 export type ParsedPlanFile = {
+  id?: string;
   name: string;
+  createdAt?: string;
+  updatedAt?: string;
   creditLimitPerSemester: number;
   semesters: Array<{
     label: string;
@@ -25,6 +34,7 @@ export type ParsedPlanFile = {
     }>;
   }>;
   storageCodes: string[];
+  cachedCourses: CachedCourse[];
 };
 
 export type ImportedPlan = {
@@ -146,6 +156,17 @@ function requireSection(
 }
 
 export function serializePlanFile(plan: StudyPlan): string {
+  const allCourses = [
+    ...plan.semesters.flatMap((semester) => semester.courses),
+    ...plan.storage,
+  ];
+  const coursesByCode = new Map<string, PlannedCourse>();
+
+  for (const course of allCourses) {
+    if (!coursesByCode.has(course.code)) {
+      coursesByCode.set(course.code, course);
+    }
+  }
   const slotCount = Math.max(
     plan.creditLimitPerSemester,
     ...plan.semesters.map((semester) =>
@@ -162,8 +183,29 @@ export function serializePlanFile(plan: StudyPlan): string {
   const lines = [
     "[plan]",
     csvRow(["format_version", FORMAT_VERSION]),
+    csvRow(["plan_id", plan.id]),
     csvRow(["plan_name", plan.name]),
+    csvRow(["created_at", plan.createdAt]),
+    csvRow(["updated_at", plan.updatedAt]),
     csvRow(["credit_limit", plan.creditLimitPerSemester]),
+    "",
+    "[courses]",
+    csvRow([
+      "code",
+      "name",
+      "credits",
+      "department",
+      "metadata_fallback",
+    ]),
+    ...[...coursesByCode.values()].map((course) =>
+      csvRow([
+        course.code,
+        course.name,
+        course.credits,
+        course.department ?? "",
+        course.metadataFallback ? "true" : "false",
+      ]),
+    ),
     "",
     "[semesters]",
     csvRow(["semester", "term", ...slotHeaders]),
@@ -196,11 +238,18 @@ export function parsePlanFile(text: string): ParsedPlanFile {
     planRows.map((row) => [row[0]?.trim(), row[1] ?? ""]),
   );
 
-  if (metadata.get("format_version") !== FORMAT_VERSION) {
+  const formatVersion = metadata.get("format_version");
+  if (
+    formatVersion !== FORMAT_VERSION &&
+    formatVersion !== LEGACY_FORMAT_VERSION
+  ) {
     throw new PlanFileError("Unsupported or missing plan format version.");
   }
 
+  const id = metadata.get("plan_id")?.trim() || undefined;
   const name = metadata.get("plan_name")?.trim();
+  const createdAt = metadata.get("created_at")?.trim() || undefined;
+  const updatedAt = metadata.get("updated_at")?.trim() || undefined;
   const creditLimit = Number(metadata.get("credit_limit"));
 
   if (!name) {
@@ -262,35 +311,71 @@ export function parsePlanFile(text: string): ParsedPlanFile {
     .slice(1)
     .map((row) => normalizeCode(row[0] ?? ""))
     .filter(Boolean);
+  const courseRows = sections.get("courses");
+  const cachedCourses: CachedCourse[] = [];
+
+  if (formatVersion === FORMAT_VERSION) {
+    if (!courseRows) {
+      throw new PlanFileError("Missing required [courses] section.");
+    }
+    if (
+      courseRows[0]?.map((cell) => cell.trim()).join(",") !==
+      "code,name,credits,department,metadata_fallback"
+    ) {
+      throw new PlanFileError("The [courses] header is invalid.");
+    }
+
+    for (const [index, row] of courseRows.slice(1).entries()) {
+      const code = normalizeCode(row[0] ?? "");
+      const courseName = row[1]?.trim();
+      const credits = Number(row[2]);
+      const department = row[3]?.trim().toUpperCase() || undefined;
+      const fallbackText = row[4]?.trim().toLowerCase();
+
+      if (
+        !code ||
+        !courseName ||
+        !Number.isFinite(credits) ||
+        credits < 0 ||
+        !["true", "false"].includes(fallbackText)
+      ) {
+        throw new PlanFileError(
+          `Course metadata row ${index + 1} is invalid.`,
+        );
+      }
+
+      cachedCourses.push({
+        code,
+        name: courseName,
+        credits,
+        department,
+        ...(fallbackText === "true" ? { metadataFallback: true } : {}),
+      });
+    }
+  }
 
   return {
+    id,
     name,
+    createdAt,
+    updatedAt,
     creditLimitPerSemester: creditLimit,
     semesters,
     storageCodes,
-  };
-}
-
-function fallbackCourse(code: string): Course {
-  const department = code.split("-", 1)[0];
-  return {
-    code,
-    name: `Unknown course (${code})`,
-    credits: FALLBACK_CREDITS,
-    department: department || undefined,
+    cachedCourses,
   };
 }
 
 function plannedCourse(
   course: Course,
-  fallback: boolean,
+  metadataFallback: boolean,
   slotStart?: number,
 ): PlannedCourse {
   return {
     ...course,
     id: createId(),
     ...(slotStart === undefined ? {} : { slotStart }),
-    ...(fallback ? { metadataFallback: true } : {}),
+    ...(metadataFallback ? { metadataFallback: true } : {}),
   };
 }
 
@@ -306,34 +391,27 @@ export async function importPlanFile(
     ...parsed.storageCodes,
   ];
   const uniqueCodes = [...new Set(codes)];
-  const resolved = new Map<string, Course>();
-  const fallbackCodes: string[] = [];
-
-  await Promise.all(
-    uniqueCodes.map(async (code) => {
-      let course: Course | null = null;
-
-      try {
-        course = await lookup(code);
-      } catch {
-        course = null;
-      }
-
-      if (!course) {
-        fallbackCodes.push(code);
-        course = fallbackCourse(code);
-      }
-
-      resolved.set(code, course);
-    }),
+  const hydrated = await hydrateCourses(
+    uniqueCodes,
+    parsed.cachedCourses,
+    lookup,
   );
 
   const now = new Date().toISOString();
-  const fallbackSet = new Set(fallbackCodes);
+  const fallbackSet = new Set(hydrated.fallbackCodes);
+  const cachedFallbackSet = new Set(
+    parsed.cachedCourses
+      .filter(
+        (course) =>
+          course.metadataFallback &&
+          hydrated.cachedCodes.includes(course.code),
+      )
+      .map((course) => course.code),
+  );
   const plan: StudyPlan = {
-    id: createId(),
+    id: parsed.id ?? createId(),
     name: parsed.name,
-    createdAt: now,
+    createdAt: parsed.createdAt ?? now,
     updatedAt: now,
     creditLimitPerSemester: parsed.creditLimitPerSemester,
     semesters: parsed.semesters.map((semester) => ({
@@ -341,17 +419,24 @@ export async function importPlanFile(
       label: semester.label,
       termHint: semester.termHint,
       courses: semester.courses.map(({ code, slotStart }) =>
-        plannedCourse(resolved.get(code)!, fallbackSet.has(code), slotStart),
+        plannedCourse(
+          hydrated.courses.get(code)!,
+          fallbackSet.has(code) || cachedFallbackSet.has(code),
+          slotStart,
+        ),
       ),
     })),
     storage: parsed.storageCodes.map((code) =>
-      plannedCourse(resolved.get(code)!, fallbackSet.has(code)),
+      plannedCourse(
+        hydrated.courses.get(code)!,
+        fallbackSet.has(code) || cachedFallbackSet.has(code),
+      ),
     ),
   };
 
   return {
     plan,
-    fallbackCodes: fallbackCodes.sort(),
+    fallbackCodes: hydrated.fallbackCodes,
   };
 }
 

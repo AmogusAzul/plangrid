@@ -2,16 +2,19 @@ import { getCourseByCode } from "../api/courseApi";
 import type { Course, PlannedCourse } from "../models/course";
 import type { StudyPlan } from "../models/studyPlan";
 import { createId, isRegularTerm } from "../state/planFactory";
+import {
+  hydrateCourses,
+  type CourseLookup,
+} from "../state/courseHydration";
 import blankPresetData from "./blank-8-semesters.json";
 import isisPresetData from "./isis-2026-20-starter.json";
-
-type CourseLookup = (code: string) => Promise<Course | null>;
 
 export type PlanPreset = {
   id: string;
   name: string;
   description: string;
   creditLimitPerSemester: number;
+  courses: Course[];
   semesters: Array<{
     label: string;
     termHint: string;
@@ -51,6 +54,17 @@ function validatePreset(value: unknown): PlanPreset {
     !Number.isInteger(preset.creditLimitPerSemester) ||
     preset.creditLimitPerSemester! < 1 ||
     preset.creditLimitPerSemester! > 30 ||
+    !Array.isArray(preset.courses) ||
+    !preset.courses.every(
+      (course) =>
+        typeof course?.code === "string" &&
+        typeof course.name === "string" &&
+        typeof course.credits === "number" &&
+        Number.isFinite(course.credits) &&
+        course.credits >= 0 &&
+        (course.department === undefined ||
+          typeof course.department === "string"),
+    ) ||
     !validSemesters ||
     !Array.isArray(preset.storageCourseCodes) ||
     !preset.storageCourseCodes.every((code) => typeof code === "string")
@@ -65,15 +79,6 @@ export const planPresets: PlanPreset[] = [
   validatePreset(blankPresetData),
   validatePreset(isisPresetData),
 ];
-
-function fallbackCourse(code: string): Course {
-  return {
-    code,
-    name: `Unknown course (${code})`,
-    credits: 3,
-    department: code.split("-", 1)[0] || undefined,
-  };
-}
 
 function toPlannedCourse(
   course: Course,
@@ -95,34 +100,18 @@ export async function loadPlanPreset(
     ...preset.storageCourseCodes,
   ].map((code) => code.trim().toUpperCase());
   const uniqueCodes = [...new Set(codes)];
-  const resolved = new Map<string, Course>();
-  const fallbackCodes: string[] = [];
-
-  await Promise.all(
-    uniqueCodes.map(async (code) => {
-      let course: Course | null = null;
-
-      try {
-        course = await lookup(code);
-      } catch {
-        course = null;
-      }
-
-      if (!course) {
-        fallbackCodes.push(code);
-        course = fallbackCourse(code);
-      }
-
-      resolved.set(code, course);
-    }),
+  const hydrated = await hydrateCourses(
+    uniqueCodes,
+    preset.courses,
+    lookup,
   );
 
-  const fallbackSet = new Set(fallbackCodes);
+  const fallbackSet = new Set(hydrated.fallbackCodes);
   const now = new Date().toISOString();
   const courseFor = (code: string) => {
     const normalizedCode = code.trim().toUpperCase();
     return toPlannedCourse(
-      resolved.get(normalizedCode)!,
+      hydrated.courses.get(normalizedCode)!,
       fallbackSet.has(normalizedCode),
     );
   };
@@ -142,6 +131,6 @@ export async function loadPlanPreset(
       })),
       storage: preset.storageCourseCodes.map(courseFor),
     },
-    fallbackCodes: fallbackCodes.sort(),
+    fallbackCodes: hydrated.fallbackCodes,
   };
 }

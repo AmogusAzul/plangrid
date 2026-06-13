@@ -53,8 +53,21 @@ describe("plan file export", () => {
     const parsed = parsePlanFile(text);
 
     expect(text).toContain('plan_name,"Plan, ""Special"""');
+    expect(text).toContain("[courses]");
+    expect(text).toContain("ISIS-1221,Programming,3");
     expect(text).toContain("slot_10");
     expect(parsed.name).toBe('Plan, "Special"');
+    expect(parsed.id).toBe(plan.id);
+    expect(parsed.createdAt).toBe(plan.createdAt);
+    expect(parsed.cachedCourses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "ISIS-1221",
+          name: "Programming",
+          credits: 3,
+        }),
+      ]),
+    );
     expect(parsed.semesters).toHaveLength(2);
     expect(parsed.semesters[0].courses).toEqual([
       { code: "ISIS-1221", slotStart: 8 },
@@ -67,7 +80,7 @@ describe("plan file export", () => {
     const text = serializePlanFile(plan);
 
     expect(() =>
-      parsePlanFile(text.replace("format_version,1", "format_version,99")),
+      parsePlanFile(text.replace("format_version,2", "format_version,99")),
     ).toThrow(PlanFileError);
     expect(() =>
       parsePlanFile(text.replace("[storage]", "[backlog]")),
@@ -123,6 +136,65 @@ describe("plan file import", () => {
       imported.plan.semesters[1].courses[0].id,
     );
     expect(imported.plan.storage[0].code).toBe("MATE-1203");
+  });
+
+  it("uses cached metadata when fresh lookup fails", async () => {
+    const plan = createBlankPlan(1);
+    plan.semesters[0].courses.push({
+      id: "cached",
+      code: "ISIS-1221",
+      name: "Cached programming",
+      credits: 3,
+      department: "ISIS",
+    });
+
+    const imported = await importPlanFile(
+      serializePlanFile(plan),
+      async () => {
+        throw new Error("offline");
+      },
+    );
+
+    expect(imported.fallbackCodes).toEqual([]);
+    expect(imported.plan.semesters[0].courses[0]).toEqual(
+      expect.objectContaining({
+        name: "Cached programming",
+        credits: 3,
+      }),
+    );
+  });
+
+  it("prefers fresh metadata over cached values", async () => {
+    const plan = createBlankPlan(1);
+    plan.semesters[0].courses.push({
+      id: "cached",
+      code: "ISIS-1221",
+      name: "Cached programming",
+      credits: 3,
+    });
+
+    const imported = await importPlanFile(
+      serializePlanFile(plan),
+      async () => ({
+        code: "ISIS-1221",
+        name: "Fresh programming",
+        credits: 4,
+        department: "ISIS",
+      }),
+    );
+
+    expect(imported.plan.semesters[0].courses[0]).toEqual(
+      expect.objectContaining({
+        name: "Fresh programming",
+        credits: 4,
+      }),
+    );
+    expect(
+      Object.hasOwn(
+        imported.plan.semesters[0].courses[0],
+        "metadataFallback",
+      ),
+    ).toBe(false);
   });
 
   it("uses persistent three-credit fallback metadata when lookup fails", async () => {

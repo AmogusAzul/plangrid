@@ -28,11 +28,18 @@ describe("plan presets", () => {
   });
 
   it("fetches each unique code once and creates fresh course identities", async () => {
+    const course: Course = {
+      code: "ISIS-1221",
+      name: "Programming",
+      credits: 3,
+      department: "ISIS",
+    };
     const preset: PlanPreset = {
       id: "test",
       name: "Test preset",
       description: "Test",
       creditLimitPerSemester: 21,
+      courses: [course],
       semesters: [
         {
           label: "Semester 1",
@@ -41,12 +48,6 @@ describe("plan presets", () => {
         },
       ],
       storageCourseCodes: ["ISIS-1221"],
-    };
-    const course: Course = {
-      code: "ISIS-1221",
-      name: "Programming",
-      credits: 3,
-      department: "ISIS",
     };
     const lookup = vi.fn(async () => course);
 
@@ -60,12 +61,29 @@ describe("plan presets", () => {
     expect(new Set(plannedCourses.map((entry) => entry.id)).size).toBe(3);
   });
 
+  it("uses embedded preset metadata when the API fails", async () => {
+    const preset = planPresets[1];
+    const loaded = await loadPlanPreset(preset, async () => {
+      throw new Error("offline");
+    });
+
+    expect(loaded.fallbackCodes).toEqual([]);
+    expect(loaded.plan.semesters[0].courses[0]).toEqual(
+      expect.objectContaining({
+        code: "ISIS-1001",
+        name: "Introduccion a la Ingenieria de Sistemas",
+        credits: 3,
+      }),
+    );
+  });
+
   it("marks unavailable course metadata for persistent warnings", async () => {
     const preset: PlanPreset = {
       id: "fallback",
       name: "Fallback",
       description: "Test",
       creditLimitPerSemester: 21,
+      courses: [],
       semesters: [
         {
           label: "Semester 1",

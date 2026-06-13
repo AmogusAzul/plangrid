@@ -42,9 +42,12 @@ plan after confirmation.
 - `[semesters]` stores semester labels, terms, and course starting slots.
 - `[storage]` stores unplaced course codes.
 
-Only course codes are stored. During import, PlanGrid fetches current course
-metadata from the Uniandes course service. If metadata cannot be fetched, the
-course remains usable with three fallback credits and a visible warning.
+The file stores course codes, names, credits, departments, plan timestamps,
+semester placement, and fallback status. During import, PlanGrid still requests
+current metadata from the Uniandes course service. Fresh metadata takes
+priority; embedded metadata is used when the service is unavailable or no
+course is returned. A synthetic three-credit card and visible warning are used
+only when neither source has metadata.
 
 ## Run Locally
 
