@@ -30,6 +30,7 @@ import {
   serializeCourseDrag,
   type CourseDragPayload,
 } from "./courseDrag";
+import { captureAppScroll, restoreAppScroll } from "./appScroll";
 
 type AppActions = {
   updatePlan: (update: (plan: StudyPlan) => StudyPlan) => void;
@@ -149,6 +150,7 @@ export function renderApp(
   courseDestination: string,
   actions: AppActions,
 ): void {
+  const scrollPosition = captureAppScroll(root);
   const warnings = validatePlan(plan);
   const affectedCourseCodes = new Set(
     warnings.flatMap((warning) => warning.relatedCourseCodes ?? []),
@@ -471,6 +473,7 @@ export function renderApp(
       </main>
     </div>
   `;
+  restoreAppScroll(root, scrollPosition);
 
   root.querySelector<HTMLInputElement>("#plan-name")?.addEventListener("change", (event) => {
     const name = (event.currentTarget as HTMLInputElement).value.trim();
