@@ -2,6 +2,7 @@ import type { Course, PlannedCourse } from "../models/course";
 import type { StudyPlan } from "../models/studyPlan";
 import { STORAGE_DESTINATION } from "./courseDestination";
 import { toPlannedCourse } from "./planFactory";
+import { insertCourseAtSlot } from "./semesterLayout";
 
 type RemovedCourse = {
   course: PlannedCourse | null;
@@ -43,6 +44,7 @@ export function addCourse(
   plan: StudyPlan,
   course: Course,
   destination: string,
+  requestedSlot?: number,
 ): StudyPlan {
   const destinationExists =
     destination === STORAGE_DESTINATION ||
@@ -63,7 +65,14 @@ export function addCourse(
     ...plan,
     semesters: plan.semesters.map((semester) =>
       semester.id === destination
-        ? { ...semester, courses: [...semester.courses, plannedCourse] }
+        ? {
+            ...semester,
+            courses: insertCourseAtSlot(
+              semester.courses,
+              plannedCourse,
+              requestedSlot,
+            ),
+          }
         : semester,
     ),
   };
@@ -73,6 +82,7 @@ export function moveCourse(
   plan: StudyPlan,
   courseId: string,
   destination: string,
+  requestedSlot?: number,
 ): StudyPlan {
   const destinationExists =
     destination === STORAGE_DESTINATION ||
@@ -84,9 +94,10 @@ export function moveCourse(
   if (!removed.course) return plan;
 
   if (destination === STORAGE_DESTINATION) {
+    const { slotStart: _slotStart, ...storedCourse } = removed.course;
     return {
       ...removed.plan,
-      storage: [...removed.plan.storage, removed.course],
+      storage: [...removed.plan.storage, storedCourse],
     };
   }
 
@@ -94,7 +105,14 @@ export function moveCourse(
     ...removed.plan,
     semesters: removed.plan.semesters.map((semester) =>
       semester.id === destination
-        ? { ...semester, courses: [...semester.courses, removed.course!] }
+        ? {
+            ...semester,
+            courses: insertCourseAtSlot(
+              semester.courses,
+              removed.course!,
+              requestedSlot,
+            ),
+          }
         : semester,
     ),
   };

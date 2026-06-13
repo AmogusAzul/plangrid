@@ -1,5 +1,6 @@
 import type { StudyPlan } from "../models/studyPlan";
 import { createBlankPlan } from "./planFactory";
+import { normalizeSemesterCourses } from "./semesterLayout";
 
 export const STORAGE_KEY = "plangrid.currentPlan.v1";
 
@@ -22,7 +23,15 @@ export function loadPlan(storage: Storage = localStorage): StudyPlan {
     if (!stored) return createBlankPlan();
 
     const parsed: unknown = JSON.parse(stored);
-    return isStudyPlan(parsed) ? parsed : createBlankPlan();
+    if (!isStudyPlan(parsed)) return createBlankPlan();
+
+    return {
+      ...parsed,
+      semesters: parsed.semesters.map((semester) => ({
+        ...semester,
+        courses: normalizeSemesterCourses(semester.courses),
+      })),
+    };
   } catch {
     return createBlankPlan();
   }
@@ -40,4 +49,3 @@ export function savePlan(
   storage.setItem(STORAGE_KEY, JSON.stringify(savedPlan));
   return savedPlan;
 }
-

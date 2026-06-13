@@ -50,6 +50,8 @@ working directory.
 - Semester credit-load meters and preserved add-course destination
 - Native drag-and-drop from search results, storage, and semester rows
 - Immediate autosave, totals, and warning updates after every drop
+- Cell-snapped semester placement with persistent gaps and collision shifting
+- Backward-compatible migration of older array-only saved plans
 
 The course API is public but unofficially documented. If it is unavailable,
 PlanGrid displays a small set of development fallback courses instead of

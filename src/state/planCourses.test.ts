@@ -14,13 +14,14 @@ const course: PlannedCourse = {
 describe("planCourses", () => {
   it("adds a catalog course with a new local identity", () => {
     const plan = createBlankPlan(1);
-    const added = addCourse(plan, course, plan.semesters[0].id);
+    const added = addCourse(plan, course, plan.semesters[0].id, 8);
 
     expect(added.semesters[0].courses[0]).toEqual(
       expect.objectContaining({
         code: course.code,
         name: course.name,
         credits: course.credits,
+        slotStart: 8,
       }),
     );
     expect(added.semesters[0].courses[0].id).not.toBe(course.id);
@@ -40,10 +41,43 @@ describe("planCourses", () => {
     const plan = createBlankPlan(2);
     plan.storage.push(course);
 
-    const moved = moveCourse(plan, course.id, plan.semesters[1].id);
+    const moved = moveCourse(plan, course.id, plan.semesters[1].id, 12);
 
     expect(moved.storage).toHaveLength(0);
-    expect(moved.semesters[1].courses).toEqual([course]);
+    expect(moved.semesters[1].courses).toEqual([
+      { ...course, slotStart: 12 },
+    ]);
+  });
+
+  it("repositions an existing course inside its semester", () => {
+    const plan = createBlankPlan(1);
+    plan.semesters[0].courses.push(
+      { ...course, slotStart: 1 },
+      {
+        id: "course-2",
+        code: "MATE-1203",
+        name: "Calculus",
+        credits: 3,
+        slotStart: 4,
+      },
+    );
+
+    const moved = moveCourse(
+      plan,
+      course.id,
+      plan.semesters[0].id,
+      4,
+    );
+
+    expect(
+      moved.semesters[0].courses.map((entry) => [
+        entry.id,
+        entry.slotStart,
+      ]),
+    ).toEqual([
+      ["course-1", 4],
+      ["course-2", 7],
+    ]);
   });
 
   it("allows a move that exceeds the semester credit limit", () => {
@@ -53,7 +87,9 @@ describe("planCourses", () => {
 
     const moved = moveCourse(plan, course.id, plan.semesters[0].id);
 
-    expect(moved.semesters[0].courses).toEqual([course]);
+    expect(moved.semesters[0].courses).toEqual([
+      { ...course, slotStart: 1 },
+    ]);
   });
 
   it("leaves the plan unchanged for an invalid destination", () => {
