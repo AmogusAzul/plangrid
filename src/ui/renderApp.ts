@@ -33,7 +33,7 @@ import {
 type AppActions = {
   updatePlan: (update: (plan: StudyPlan) => StudyPlan) => void;
   resetPlan: () => void;
-  exportPNG: (root: string) => void;
+  exportPNG: (root: string, planName: string) => void;
   setCourseDestination: (destination: string) => void;
   search: (query: string) => Promise<void>;
 };
@@ -700,7 +700,7 @@ export function renderApp(
   });
 
   root.querySelector<HTMLButtonElement>("#export-png")?.addEventListener("click", () => {
-      actions.exportPNG(mainClass);
+      actions.exportPNG(mainClass, (document.getElementById("plan-name") as HTMLInputElement).value);
   });
 
 }

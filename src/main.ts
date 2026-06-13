@@ -39,8 +39,8 @@ function render(): void {
       courseDestination = getDefaultCourseDestination(plan);
       render();
     },
-    exportPNG(root: string) {
-      exportPlanPNG(root);
+    exportPNG(root: string, planName: string) {
+      exportPlanPNG(root, planName);
     },
     setCourseDestination(destination) {
       courseDestination = normalizeCourseDestination(plan, destination);

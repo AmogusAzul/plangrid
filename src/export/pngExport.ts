@@ -1,5 +1,7 @@
 import { toPng } from 'html-to-image';
 
+import { getFileName } from './common';
+
 function downloadDataUrl(dataUrl: string, filename: string): void {
   const link = document.createElement("a");
   link.download = filename;
@@ -7,7 +9,7 @@ function downloadDataUrl(dataUrl: string, filename: string): void {
   link.click();
 }
 
-export async function exportPlanPNG(rootClass : string): Promise<void> {
+export async function exportPlanPNG(rootClass : string, planName : string): Promise<void> {
     const node: HTMLElement = document.getElementsByClassName(rootClass).item(0) as HTMLElement;
 
     if (!(node instanceof HTMLElement)) {
@@ -37,5 +39,5 @@ export async function exportPlanPNG(rootClass : string): Promise<void> {
     },
   });
 
-  downloadDataUrl(dataUrl, "plan.png");
+  downloadDataUrl(dataUrl, getFileName(planName)+".png");
 }
