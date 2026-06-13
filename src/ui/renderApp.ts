@@ -55,7 +55,7 @@ function courseCard(
 ): string {
   const palette = getCoursePalette(course);
   const duplicateBadge = duplicatedCodes.has(course.code)
-    ? '<span class="course-card__warning" title="Duplicate course">!</span>'
+    ? '<span class="course-card__warning" role="img" aria-label="Warning: duplicate course" title="Duplicate course">!</span>'
     : "";
   const moveAction =
     location === "storage"
@@ -164,7 +164,7 @@ export function renderApp(
       </header>
 
       <aside class="sidebar">
-        <section class="panel warnings-panel">
+        <section class="panel warnings-panel" aria-live="polite">
           <div class="panel__heading">
             <div>
               <span class="eyebrow">Plan health</span>
@@ -177,7 +177,7 @@ export function renderApp(
               ? `<ul class="warning-list">${warnings
                   .map(
                     (warning) =>
-                      `<li><span>!</span><p>${escapeHtml(warning.message)}</p></li>`,
+                      `<li data-warning-id="${escapeHtml(warning.id)}"><span aria-hidden="true">!</span><p>${escapeHtml(warning.message)}</p></li>`,
                   )
                   .join("")}</ul>`
               : '<p class="empty-state empty-state--success">No plan warnings.</p>'
@@ -261,7 +261,7 @@ export function renderApp(
       <main class="planner">
         <section class="planner-toolbar">
           <label class="roadmap-title" for="plan-name">
-            <span class="eyebrow">Academic roadmap - edit plan name</span>
+            <span class="eyebrow">Academic roadmap</span>
             <input
               id="plan-name"
               value="${escapeHtml(plan.name)}"
@@ -270,7 +270,10 @@ export function renderApp(
             />
           </label>
           <div class="plan-stats">
-            <div><strong>${getTotalPlanCredits(plan)}</strong><span>Total credits</span></div>
+            <div class="plan-total-card">
+              <strong>${getTotalPlanCredits(plan)}</strong>
+              <span>Total plan credits</span>
+            </div>
             <label>
               <span>Semesters</span>
               <input id="semester-count" type="number" min="1" max="16" value="${plan.semesters.length}" />

@@ -9,7 +9,6 @@ export function sumCredits(courses: PlannedCourse[]): number {
 export function getTotalPlanCredits(plan: StudyPlan): number {
   return sumCredits([
     ...plan.semesters.flatMap((semester) => semester.courses),
-    ...plan.storage,
   ]);
 }
 
