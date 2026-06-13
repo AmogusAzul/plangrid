@@ -3,17 +3,20 @@ import type { CourseSearchState } from "../models/courseSearch";
 import type { StudyPlan } from "../models/studyPlan";
 import { mockCourses } from "../presets/mockCourses";
 import { STORAGE_DESTINATION } from "../state/courseDestination";
-import { deleteCourse, moveCourse } from "../state/planCourses";
-import {
-  resizeSemesters,
-  toPlannedCourse,
-} from "../state/planFactory";
+import { addCourse, deleteCourse, moveCourse } from "../state/planCourses";
+import { resizeSemesters } from "../state/planFactory";
 import {
   getTotalPlanCredits,
   sumCredits,
   validatePlan,
 } from "../validation/validatePlan";
 import { getCourseColor, getCoursePalette } from "./courseColor";
+import {
+  COURSE_DRAG_TYPE,
+  parseCourseDrag,
+  serializeCourseDrag,
+  type CourseDragPayload,
+} from "./courseDrag";
 
 type AppActions = {
   updatePlan: (update: (plan: StudyPlan) => StudyPlan) => void;
@@ -51,6 +54,8 @@ function courseCard(
       class="course-card"
       style="--course-span: ${Math.max(1, course.credits)}; --course-color: ${palette.background}"
       data-course-id="${escapeHtml(course.id)}"
+      draggable="true"
+      title="Drag to another semester or storage"
     >
       ${duplicateBadge}
       <strong>${escapeHtml(course.code)}</strong>
@@ -66,7 +71,12 @@ function courseCard(
 
 function catalogCourseItem(course: Course): string {
   return `
-    <li class="catalog-course">
+    <li
+      class="catalog-course"
+      data-catalog-course="${escapeHtml(course.code)}"
+      draggable="true"
+      title="Drag into a semester or storage"
+    >
       <span class="catalog-course__swatch" style="--course-color: ${getCourseColor(course)}"></span>
       <div>
         <strong>${escapeHtml(course.code)}</strong>
@@ -173,7 +183,11 @@ export function renderApp(
             </div>
             <span class="count-badge">${plan.storage.length}</span>
           </div>
-          <div class="storage-track">
+          <div
+            class="storage-track drop-zone"
+            data-drop-destination="${STORAGE_DESTINATION}"
+            aria-label="Unplaced course storage drop zone"
+          >
             ${
               plan.storage.length > 0
                 ? plan.storage
@@ -186,7 +200,7 @@ export function renderApp(
                       ),
                     )
                     .join("")
-                : '<p class="empty-state">Courses removed from shortened plans land here.</p>'
+                : '<p class="empty-state">Drop unplaced courses here.</p>'
             }
           </div>
         </section>
@@ -227,6 +241,7 @@ export function renderApp(
               <option value="storage" ${courseDestination === "storage" ? "selected" : ""}>Storage</option>
             </select>
           </label>
+          <p class="drag-hint">Drag any result directly into a semester or storage.</p>
           <div class="search-results" aria-live="polite">
             ${searchContent(search)}
           </div>
@@ -283,7 +298,11 @@ export function renderApp(
                       <span style="width: ${capacityPercent}%"></span>
                     </div>
                   </header>
-                  <div class="semester-track">
+                  <div
+                    class="semester-track drop-zone"
+                    data-drop-destination="${escapeHtml(semester.id)}"
+                    aria-label="${escapeHtml(semester.label)} course drop zone"
+                  >
                     ${
                       semester.courses.length > 0
                         ? semester.courses
@@ -291,7 +310,7 @@ export function renderApp(
                               courseCard(course, duplicatedCodes, "semester"),
                             )
                             .join("")
-                        : '<p class="semester-empty">Add a course from the catalog</p>'
+                        : '<p class="semester-empty">Drop courses here</p>'
                     }
                   </div>
                 </article>
@@ -354,22 +373,7 @@ export function renderApp(
 
       if (!course || !destination) return;
 
-      actions.updatePlan((current) => {
-        const plannedCourse = toPlannedCourse(course);
-
-        if (destination === "storage") {
-          return { ...current, storage: [...current.storage, plannedCourse] };
-        }
-
-        return {
-          ...current,
-          semesters: current.semesters.map((semester) =>
-            semester.id === destination
-              ? { ...semester, courses: [...semester.courses, plannedCourse] }
-              : semester,
-          ),
-        };
-      });
+      actions.updatePlan((current) => addCourse(current, course, destination));
     });
   });
 
@@ -398,6 +402,89 @@ export function renderApp(
       actions.updatePlan((current) =>
         moveCourse(current, courseId, courseDestination),
       );
+    });
+  });
+
+  let activeDrag: CourseDragPayload | null = null;
+
+  function clearDragStyles(): void {
+    root.querySelectorAll(".is-dragging, .drop-zone--active").forEach((element) => {
+      element.classList.remove("is-dragging", "drop-zone--active");
+    });
+    activeDrag = null;
+  }
+
+  function beginDrag(
+    event: DragEvent,
+    element: HTMLElement,
+    payload: CourseDragPayload,
+  ): void {
+    if (!event.dataTransfer) return;
+
+    activeDrag = payload;
+    element.classList.add("is-dragging");
+    event.dataTransfer.effectAllowed =
+      payload.kind === "catalog-course" ? "copy" : "move";
+    const serialized = serializeCourseDrag(payload);
+    event.dataTransfer.setData(COURSE_DRAG_TYPE, serialized);
+    event.dataTransfer.setData("text/plain", serialized);
+  }
+
+  root.querySelectorAll<HTMLElement>("[data-course-id]").forEach((card) => {
+    card.addEventListener("dragstart", (event) => {
+      const courseId = card.dataset.courseId;
+      if (!courseId) return;
+      beginDrag(event, card, { kind: "planned-course", courseId });
+    });
+    card.addEventListener("dragend", clearDragStyles);
+  });
+
+  root.querySelectorAll<HTMLElement>("[data-catalog-course]").forEach((result) => {
+    result.addEventListener("dragstart", (event) => {
+      const courseCode = result.dataset.catalogCourse;
+      if (!courseCode) return;
+      beginDrag(event, result, { kind: "catalog-course", courseCode });
+    });
+    result.addEventListener("dragend", clearDragStyles);
+  });
+
+  root.querySelectorAll<HTMLElement>("[data-drop-destination]").forEach((zone) => {
+    zone.addEventListener("dragover", (event) => {
+      if (!activeDrag || !event.dataTransfer) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect =
+        activeDrag.kind === "catalog-course" ? "copy" : "move";
+      zone.classList.add("drop-zone--active");
+    });
+
+    zone.addEventListener("dragleave", (event) => {
+      const nextTarget = event.relatedTarget;
+      if (nextTarget instanceof Node && zone.contains(nextTarget)) return;
+      zone.classList.remove("drop-zone--active");
+    });
+
+    zone.addEventListener("drop", (event) => {
+      event.preventDefault();
+      const destination = zone.dataset.dropDestination;
+      const serialized =
+        event.dataTransfer?.getData(COURSE_DRAG_TYPE) ||
+        event.dataTransfer?.getData("text/plain") ||
+        "";
+      const payload = parseCourseDrag(serialized);
+      clearDragStyles();
+
+      if (!destination || !payload) return;
+
+      if (payload.kind === "planned-course") {
+        actions.updatePlan((current) =>
+          moveCourse(current, payload.courseId, destination),
+        );
+        return;
+      }
+
+      const course = availableCourses.get(payload.courseCode);
+      if (!course) return;
+      actions.updatePlan((current) => addCourse(current, course, destination));
     });
   });
 

@@ -1,6 +1,7 @@
-import type { PlannedCourse } from "../models/course";
+import type { Course, PlannedCourse } from "../models/course";
 import type { StudyPlan } from "../models/studyPlan";
 import { STORAGE_DESTINATION } from "./courseDestination";
+import { toPlannedCourse } from "./planFactory";
 
 type RemovedCourse = {
   course: PlannedCourse | null;
@@ -38,6 +39,36 @@ export function deleteCourse(plan: StudyPlan, courseId: string): StudyPlan {
   return removeCourse(plan, courseId).plan;
 }
 
+export function addCourse(
+  plan: StudyPlan,
+  course: Course,
+  destination: string,
+): StudyPlan {
+  const destinationExists =
+    destination === STORAGE_DESTINATION ||
+    plan.semesters.some((semester) => semester.id === destination);
+
+  if (!destinationExists) return plan;
+
+  const plannedCourse = toPlannedCourse(course);
+
+  if (destination === STORAGE_DESTINATION) {
+    return {
+      ...plan,
+      storage: [...plan.storage, plannedCourse],
+    };
+  }
+
+  return {
+    ...plan,
+    semesters: plan.semesters.map((semester) =>
+      semester.id === destination
+        ? { ...semester, courses: [...semester.courses, plannedCourse] }
+        : semester,
+    ),
+  };
+}
+
 export function moveCourse(
   plan: StudyPlan,
   courseId: string,
@@ -68,4 +99,3 @@ export function moveCourse(
     ),
   };
 }
-
