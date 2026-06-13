@@ -1,16 +1,22 @@
 import type { Course, PlannedCourse } from "../models/course";
+import type { CourseSearchState } from "../models/courseSearch";
 import type { StudyPlan } from "../models/studyPlan";
 import { mockCourses } from "../presets/mockCourses";
 import {
   resizeSemesters,
   toPlannedCourse,
 } from "../state/planFactory";
-import { getTotalPlanCredits, sumCredits, validatePlan } from "../validation/validatePlan";
+import {
+  getTotalPlanCredits,
+  sumCredits,
+  validatePlan,
+} from "../validation/validatePlan";
 import { getCourseColor } from "./courseColor";
 
 type AppActions = {
   updatePlan: (update: (plan: StudyPlan) => StudyPlan) => void;
   resetPlan: () => void;
+  search: (query: string) => Promise<void>;
 };
 
 function escapeHtml(value: string): string {
@@ -42,7 +48,7 @@ function courseCard(course: PlannedCourse, duplicatedCodes: Set<string>): string
   `;
 }
 
-function mockCourseButton(course: Course): string {
+function catalogCourseItem(course: Course): string {
   return `
     <li class="catalog-course">
       <span class="catalog-course__swatch" style="--course-color: ${getCourseColor(course)}"></span>
@@ -54,6 +60,40 @@ function mockCourseButton(course: Course): string {
       <button data-add-course="${escapeHtml(course.code)}">Add</button>
     </li>
   `;
+}
+
+function searchContent(search: CourseSearchState): string {
+  if (search.status === "loading") {
+    return '<p class="search-status">Searching the Uniandes course catalog...</p>';
+  }
+
+  if (search.status === "error") {
+    return `
+      <div class="search-error" role="alert">
+        <strong>Live search unavailable</strong>
+        <span>${escapeHtml(search.error ?? "Course search failed.")}</span>
+      </div>
+      <p class="catalog-label">Development fallback courses</p>
+      <ul class="catalog-list">
+        ${mockCourses.map(catalogCourseItem).join("")}
+      </ul>
+    `;
+  }
+
+  if (search.status === "success") {
+    if (search.results.length === 0) {
+      return `<p class="search-status">No courses found for "${escapeHtml(search.query)}".</p>`;
+    }
+
+    return `
+      <p class="catalog-label">${search.results.length} unique courses found</p>
+      <ul class="catalog-list">
+        ${search.results.map(catalogCourseItem).join("")}
+      </ul>
+    `;
+  }
+
+  return '<p class="search-status">Search by code or course name to add a course.</p>';
 }
 
 function findAndRemoveCourse(plan: StudyPlan, courseId: string): StudyPlan {
@@ -70,6 +110,7 @@ function findAndRemoveCourse(plan: StudyPlan, courseId: string): StudyPlan {
 export function renderApp(
   root: HTMLElement,
   plan: StudyPlan,
+  search: CourseSearchState,
   actions: AppActions,
 ): void {
   const warnings = validatePlan(plan);
@@ -98,28 +139,24 @@ export function renderApp(
       </header>
 
       <aside class="sidebar">
-        <section class="panel">
+        <section class="panel warnings-panel">
           <div class="panel__heading">
             <div>
-              <span class="eyebrow">Development catalog</span>
-              <h2>Mock courses</h2>
+              <span class="eyebrow">Plan health</span>
+              <h2>Warnings</h2>
             </div>
+            <span class="count-badge">${warnings.length}</span>
           </div>
-          <label class="field">
-            <span>Add courses to</span>
-            <select id="course-destination">
-              ${plan.semesters
-                .map(
-                  (semester) =>
-                    `<option value="${escapeHtml(semester.id)}">${escapeHtml(semester.label)}</option>`,
-                )
-                .join("")}
-              <option value="storage">Storage</option>
-            </select>
-          </label>
-          <ul class="catalog-list">
-            ${mockCourses.map(mockCourseButton).join("")}
-          </ul>
+          ${
+            warnings.length > 0
+              ? `<ul class="warning-list">${warnings
+                  .map(
+                    (warning) =>
+                      `<li><span>!</span><p>${escapeHtml(warning.message)}</p></li>`,
+                  )
+                  .join("")}</ul>`
+              : '<p class="empty-state empty-state--success">No plan warnings.</p>'
+          }
         </section>
 
         <section class="panel storage-panel">
@@ -141,24 +178,45 @@ export function renderApp(
           </div>
         </section>
 
-        <section class="panel warnings-panel">
+        <section class="panel course-search-panel">
           <div class="panel__heading">
             <div>
-              <span class="eyebrow">Plan health</span>
-              <h2>Warnings</h2>
+              <span class="eyebrow">Uniandes catalog</span>
+              <h2>Add courses</h2>
             </div>
-            <span class="count-badge">${warnings.length}</span>
           </div>
-          ${
-            warnings.length > 0
-              ? `<ul class="warning-list">${warnings
-                  .map(
-                    (warning) =>
-                      `<li><span>!</span>${escapeHtml(warning.message)}</li>`,
-                  )
-                  .join("")}</ul>`
-              : '<p class="empty-state empty-state--success">No plan warnings.</p>'
-          }
+          <form class="course-search" id="course-search-form">
+            <label for="course-query">Course code or name</label>
+            <div>
+              <input
+                id="course-query"
+                name="query"
+                type="search"
+                value="${escapeHtml(search.query)}"
+                placeholder="ISIS-1225 or estructuras"
+                autocomplete="off"
+                required
+              />
+              <button type="submit" ${search.status === "loading" ? "disabled" : ""}>
+                ${search.status === "loading" ? "Searching" : "Search"}
+              </button>
+            </div>
+          </form>
+          <label class="field">
+            <span>Add courses to</span>
+            <select id="course-destination">
+              ${plan.semesters
+                .map(
+                  (semester) =>
+                    `<option value="${escapeHtml(semester.id)}">${escapeHtml(semester.label)}</option>`,
+                )
+                .join("")}
+              <option value="storage">Storage</option>
+            </select>
+          </label>
+          <div class="search-results" aria-live="polite">
+            ${searchContent(search)}
+          </div>
         </section>
       </aside>
 
@@ -186,9 +244,13 @@ export function renderApp(
             .map((semester) => {
               const credits = sumCredits(semester.courses);
               const isOverloaded = overloadedSemesters.has(semester.id);
+              const hasDuplicate = semester.courses.some((course) =>
+                duplicatedCodes.has(course.code),
+              );
+              const hasWarning = isOverloaded || hasDuplicate;
 
               return `
-                <article class="semester-row ${isOverloaded ? "semester-row--warning" : ""}">
+                <article class="semester-row ${hasWarning ? "semester-row--warning" : ""}">
                   <header class="semester-meta">
                     <span>${escapeHtml(semester.termHint)}</span>
                     <h2>${escapeHtml(semester.label)}</h2>
@@ -234,11 +296,24 @@ export function renderApp(
     }));
   });
 
+  root.querySelector<HTMLFormElement>("#course-search-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const form = event.currentTarget as HTMLFormElement;
+    const formData = new FormData(form);
+    const query = String(formData.get("query") ?? "");
+    void actions.search(query);
+  });
+
+  const availableCourses = new Map(
+    [
+      ...search.results,
+      ...(search.status === "error" ? mockCourses : []),
+    ].map((course) => [course.code, course]),
+  );
+
   root.querySelectorAll<HTMLButtonElement>("[data-add-course]").forEach((button) => {
     button.addEventListener("click", () => {
-      const course = mockCourses.find(
-        (entry) => entry.code === button.dataset.addCourse,
-      );
+      const course = availableCourses.get(button.dataset.addCourse ?? "");
       const destination =
         root.querySelector<HTMLSelectElement>("#course-destination")?.value;
 
@@ -277,4 +352,3 @@ export function renderApp(
     }
   });
 }
-

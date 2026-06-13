@@ -1,7 +1,7 @@
 # PlanGrid
 
 PlanGrid is a static academic study-plan editor for flexible advising sessions.
-Sprint 1 provides a configurable semester grid, mock course catalog, live credit
+It provides a configurable semester grid, live Uniandes course search, credit
 totals and duplicate warnings, storage for unplaced courses, and browser
 autosave.
 
@@ -43,9 +43,12 @@ working directory.
 - Live total-credit, overload, and duplicate-course feedback
 - Local browser persistence under `plangrid.currentPlan.v1`
 - Pure model and validation unit tests
+- Uniandes course API adapter with normalized, deduplicated results
+- Search by course code or name with development fallback courses
 
-Course search currently uses development fixtures. The Uniandes API adapter is
-planned for Sprint 2.
+The course API is public but unofficially documented. If it is unavailable,
+PlanGrid displays a small set of development fallback courses instead of
+blocking plan editing.
 
 ## Disclaimer
 

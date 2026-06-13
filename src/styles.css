@@ -181,6 +181,7 @@ button {
 }
 
 .field select,
+.course-search input,
 .plan-stats input {
   border: 1px solid #ccd5ca;
   border-radius: 8px;
@@ -205,6 +206,75 @@ button {
   align-items: center;
   border-bottom: 1px solid #edf0eb;
   padding: 8px 0;
+}
+
+.course-search {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 13px;
+}
+
+.course-search > label,
+.catalog-label {
+  color: #58655d;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.course-search > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.course-search input {
+  min-width: 0;
+}
+
+.course-search button {
+  border: 0;
+  border-radius: 8px;
+  padding: 0 11px;
+  color: #f4faf4;
+  background: #244a30;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.course-search button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.search-results {
+  margin-top: 14px;
+}
+
+.search-status,
+.catalog-label {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.catalog-label {
+  margin-bottom: 7px;
+}
+
+.search-status {
+  color: #7c8980;
+  font-size: 12px;
+}
+
+.search-error {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  padding: 10px;
+  color: #6b461c;
+  background: #ffe6a7;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .catalog-course__swatch {
@@ -285,10 +355,20 @@ button {
 
 .warning-list li {
   display: flex;
+  align-items: flex-start;
   gap: 8px;
-  color: #76542e;
+  border: 1px solid #e9c45e;
+  border-radius: 8px;
+  padding: 10px;
+  color: #5f421b;
+  background: #ffdf75;
   font-size: 12px;
   line-height: 1.4;
+  box-shadow: 0 3px 8px rgba(118, 84, 46, 0.08);
+}
+
+.warning-list li p {
+  margin: 0;
 }
 
 .warning-list li > span {
@@ -297,8 +377,8 @@ button {
   height: 19px;
   place-items: center;
   border-radius: 50%;
-  color: #754112;
-  background: #f7dcae;
+  color: #ffdf75;
+  background: #6b491c;
   font-weight: 900;
 }
 
@@ -370,7 +450,8 @@ button {
 }
 
 .semester-row--warning {
-  border-color: #d8a460;
+  border-color: #e2bd53;
+  background: #ffedaa;
 }
 
 .semester-meta {
@@ -402,6 +483,14 @@ button {
 
 .semester-row--warning .semester-meta strong {
   color: #a35c18;
+}
+
+.semester-row--warning .semester-meta {
+  background: #ffe28a;
+}
+
+.semester-row--warning .semester-track {
+  background-color: rgba(255, 239, 181, 0.78);
 }
 
 .semester-track {
@@ -517,4 +606,3 @@ button {
     min-height: 68px;
   }
 }
-
