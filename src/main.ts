@@ -12,6 +12,10 @@ import { createBlankPlan } from "./state/planFactory";
 import { loadPlan, savePlan, STORAGE_KEY } from "./state/planStorage";
 import { renderApp } from "./ui/renderApp";
 import { exportPlanPNG } from "./export/pngExport";
+import {
+  exportPlanFile,
+  importPlanFile,
+} from "./export/csvExport";
 
 const root = document.querySelector<HTMLElement>("#app");
 
@@ -39,8 +43,18 @@ function render(): void {
       courseDestination = getDefaultCourseDestination(plan);
       render();
     },
-    exportPNG(root: string, planName: string) {
-      exportPlanPNG(root, planName);
+    exportPNG(planner: HTMLElement, planName: string) {
+      return exportPlanPNG(planner, planName);
+    },
+    exportPlan() {
+      exportPlanFile(plan);
+    },
+    async importPlan(file: File) {
+      const imported = await importPlanFile(await file.text());
+      plan = savePlan(imported.plan);
+      courseDestination = getDefaultCourseDestination(plan);
+      render();
+      return imported.fallbackCodes;
     },
     setCourseDestination(destination) {
       courseDestination = normalizeCourseDestination(plan, destination);

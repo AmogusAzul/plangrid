@@ -70,4 +70,24 @@ describe("validatePlan", () => {
 
     expect(getTotalPlanCredits(plan)).toBe(11);
   });
+
+  it("warns when imported course metadata uses a fallback", () => {
+    const plan = createBlankPlan(1);
+    plan.storage.push({
+      id: "fallback",
+      code: "UNKNOWN-1000",
+      name: "Unknown course (UNKNOWN-1000)",
+      credits: 3,
+      metadataFallback: true,
+    });
+
+    expect(validatePlan(plan)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "metadata-fallback-UNKNOWN-1000",
+          relatedCourseCodes: ["UNKNOWN-1000"],
+        }),
+      ]),
+    );
+  });
 });

@@ -51,6 +51,15 @@ export function validatePlan(plan: StudyPlan): PlanWarning[] {
         relatedCourseCodes: [code],
       });
     }
+
+    if (courses.some((course) => course.metadataFallback)) {
+      warnings.push({
+        id: `metadata-fallback-${code}`,
+        severity: "warning",
+        message: `Could not fetch metadata for ${code}. Using fallback credits.`,
+        relatedCourseCodes: [code],
+      });
+    }
   }
 
   return warnings;

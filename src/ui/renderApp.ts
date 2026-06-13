@@ -33,7 +33,9 @@ import {
 type AppActions = {
   updatePlan: (update: (plan: StudyPlan) => StudyPlan) => void;
   resetPlan: () => void;
-  exportPNG: (root: string, planName: string) => void;
+  exportPNG: (planner: HTMLElement, planName: string) => Promise<void>;
+  exportPlan: () => void;
+  importPlan: (file: File) => Promise<string[]>;
   setCourseDestination: (destination: string) => void;
   search: (query: string) => Promise<void>;
 };
@@ -51,14 +53,14 @@ function escapeHtml(value: string): string {
 
 function courseCard(
   course: PlannedCourse,
-  duplicatedCodes: Set<string>,
+  affectedCourseCodes: Set<string>,
   location: "semester" | "storage",
   canPlace = true,
   position?: PositionedCourse,
 ): string {
   const palette = getCoursePalette(course);
-  const duplicateBadge = duplicatedCodes.has(course.code)
-    ? '<span class="course-card__warning" role="img" aria-label="Warning: duplicate course" title="Duplicate course">!</span>'
+  const warningBadge = affectedCourseCodes.has(course.code)
+    ? '<span class="course-card__warning" role="img" aria-label="Course warning" title="Course warning">!</span>'
     : "";
   const moveAction =
     location === "storage"
@@ -73,7 +75,7 @@ function courseCard(
       draggable="true"
       title="Drag to another semester or storage"
     >
-      ${duplicateBadge}
+      ${warningBadge}
       <strong>${escapeHtml(course.code)}</strong>
       <span>${escapeHtml(course.name)}</span>
       <small>${course.credits} cr</small>
@@ -146,7 +148,7 @@ export function renderApp(
   actions: AppActions,
 ): void {
   const warnings = validatePlan(plan);
-  const duplicatedCodes = new Set(
+  const affectedCourseCodes = new Set(
     warnings.flatMap((warning) => warning.relatedCourseCodes ?? []),
   );
   const overloadedSemesters = new Set(
@@ -163,6 +165,9 @@ export function renderApp(
         <div class="header-actions">
           <span class="save-status">Saved locally</span>
           <button class="button button--ghost" id="export-png">Export PNG</button>
+          <button class="button button--ghost" id="export-plan">Export Plan</button>
+          <button class="button button--ghost" id="import-plan">Import Plan</button>
+          <input id="import-plan-file" type="file" accept=".plan,text/csv" hidden />
           <button class="button button--ghost" id="reset-plan">Reset plan</button>
         </div>
       </header>
@@ -207,7 +212,7 @@ export function renderApp(
                     .map((course) =>
                       courseCard(
                         course,
-                        duplicatedCodes,
+                        affectedCourseCodes,
                         "storage",
                         courseDestination !== STORAGE_DESTINATION,
                       ),
@@ -294,10 +299,10 @@ export function renderApp(
             .map((semester, semesterIndex) => {
               const credits = sumCredits(semester.courses);
               const isOverloaded = overloadedSemesters.has(semester.id);
-              const hasDuplicate = semester.courses.some((course) =>
-                duplicatedCodes.has(course.code),
+              const hasCourseWarning = semester.courses.some((course) =>
+                affectedCourseCodes.has(course.code),
               );
-              const hasWarning = isOverloaded || hasDuplicate;
+              const hasWarning = isOverloaded || hasCourseWarning;
               const capacityPercent = Math.min(
                 100,
                 (credits / plan.creditLimitPerSemester) * 100,
@@ -347,7 +352,7 @@ export function renderApp(
                         ? positions.map((position) =>
                               courseCard(
                                 position.course,
-                                duplicatedCodes,
+                                affectedCourseCodes,
                                 "semester",
                                 true,
                                 position,
@@ -700,7 +705,57 @@ export function renderApp(
   });
 
   root.querySelector<HTMLButtonElement>("#export-png")?.addEventListener("click", () => {
-      actions.exportPNG(mainClass, (document.getElementById("plan-name") as HTMLInputElement).value);
+    const planner = root.querySelector<HTMLElement>(`.${mainClass}`);
+    const planName =
+      root.querySelector<HTMLInputElement>("#plan-name")?.value ?? plan.name;
+
+    if (!planner) return;
+
+    void actions.exportPNG(planner, planName).catch(() => {
+      window.alert("The plan image could not be exported.");
+    });
+  });
+
+  root.querySelector<HTMLButtonElement>("#export-plan")?.addEventListener("click", () => {
+    actions.exportPlan();
+  });
+
+  const importInput =
+    root.querySelector<HTMLInputElement>("#import-plan-file");
+
+  root.querySelector<HTMLButtonElement>("#import-plan")?.addEventListener("click", () => {
+    importInput?.click();
+  });
+
+  importInput?.addEventListener("change", () => {
+    const file = importInput.files?.[0];
+    importInput.value = "";
+
+    if (file && !file.name.toLowerCase().endsWith(".plan")) {
+      window.alert("Choose a PlanGrid file with the .plan extension.");
+      return;
+    }
+
+    if (
+      !file ||
+      !window.confirm(
+        "Import this plan and replace the current locally saved plan?",
+      )
+    ) {
+      return;
+    }
+
+    void actions.importPlan(file).then((fallbackCodes) => {
+      if (fallbackCodes.length > 0) {
+        window.alert(
+          `Plan imported. Metadata could not be fetched for: ${fallbackCodes.join(", ")}. Fallback credits were used.`,
+        );
+      }
+    }).catch((error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : "The plan file is invalid.";
+      window.alert(`The plan could not be imported: ${message}`);
+    });
   });
 
 }
