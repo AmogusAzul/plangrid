@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { Course } from "../models/course";
-import { getCoursePalette } from "./courseColor";
+import {
+  clearCoursePaletteCache,
+  getCoursePalette,
+} from "./courseColor";
 
 const course = (code: string): Course => ({
   code,
@@ -10,35 +13,32 @@ const course = (code: string): Course => ({
 });
 
 describe("getCoursePalette", () => {
-  it("is deterministic", () => {
-    expect(getCoursePalette(course("ISIS-1225"))).toEqual(
-      getCoursePalette(course("ISIS-1225")),
-    );
+  beforeEach(() => {
+    clearCoursePaletteCache();
   });
 
-  it("uses a broad but readable lightness range", () => {
-    const palettes = Array.from({ length: 100 }, (_, index) =>
-      getCoursePalette(course(`ISIS-${1000 + index}`)),
-    );
-    const lightnessValues = palettes.map((palette) => {
-      const match = / (\d+)%\)$/.exec(palette.background);
-      return Number(match?.[1]);
-    });
+  it("keeps a randomly assigned color stable during the session", () => {
+    const first = getCoursePalette(course("ISIS-1225"), () => 0.1);
+    const cached = getCoursePalette(course("ISIS-1225"), () => 0.9);
 
-    expect(new Set(lightnessValues).size).toBeGreaterThan(30);
-    expect(Math.min(...lightnessValues)).toBeGreaterThanOrEqual(24);
-    expect(Math.max(...lightnessValues)).toBeLessThanOrEqual(72);
+    expect(cached).toEqual(first);
   });
 
-  it("varies colors between courses in the same department", () => {
-    const colors = [
-      "ISIS-1204",
-      "ISIS-1221",
-      "ISIS-1225",
-      "ISIS-1404",
-      "ISIS-2203",
-    ].map((code) => getCoursePalette(course(code)).background);
+  it("uses the full readable lightness range", () => {
+    const darkest = getCoursePalette(course("ISIS-1000"), () => 0);
+    const lightest = getCoursePalette(course("ISIS-1001"), () => 1);
 
-    expect(new Set(colors).size).toBe(colors.length);
+    expect(darkest.background).toMatch(/ 24%\)$/);
+    expect(darkest.foreground).toBe("#ffffff");
+    expect(lightest.background).toMatch(/ 72%\)$/);
+    expect(lightest.foreground).toBe("#172019");
+  });
+
+  it("does not derive lightness from similar course numbers", () => {
+    const first = getCoursePalette(course("ISIS-1224"), () => 0);
+    const second = getCoursePalette(course("ISIS-1225"), () => 1);
+
+    expect(first.background).toMatch(/ 24%\)$/);
+    expect(second.background).toMatch(/ 72%\)$/);
   });
 });

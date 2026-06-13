@@ -15,7 +15,29 @@ export type CoursePalette = {
   foreground: "#ffffff" | "#172019";
 };
 
-export function getCoursePalette(course: Course): CoursePalette {
+const paletteCache = new Map<string, CoursePalette>();
+
+function secureRandomUnit(): number {
+  if (globalThis.crypto?.getRandomValues) {
+    const value = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(value);
+    return value[0] / 2 ** 32;
+  }
+
+  return Math.random();
+}
+
+export function clearCoursePaletteCache(): void {
+  paletteCache.clear();
+}
+
+export function getCoursePalette(
+  course: Course,
+  randomUnit = secureRandomUnit,
+): CoursePalette {
+  const cachedPalette = paletteCache.get(course.code);
+  if (cachedPalette) return cachedPalette;
+
   const department = course.department ?? course.code.split("-")[0] ?? "PLAN";
   const courseNumber = course.code.split("-")[1] ?? course.code;
   const departmentHash = hashText(department);
@@ -23,13 +45,16 @@ export function getCoursePalette(course: Course): CoursePalette {
   const hueOffset = (courseHash % 41) - 20;
   const hue = (departmentHash % 360 + hueOffset + 360) % 360;
   const saturation = 58 + ((departmentHash + courseHash) % 29);
-  const lightnessStep = courseHash % 70;
-  const lightness = Math.round(24 + (lightnessStep / 69) * 48);
+  const randomValue = Math.min(1, Math.max(0, randomUnit()));
+  const lightness = Math.round(24 + randomValue * 48);
 
-  return {
+  const palette: CoursePalette = {
     background: `hsl(${hue} ${saturation}% ${lightness}%)`,
     foreground: lightness >= 58 ? "#172019" : "#ffffff",
   };
+
+  paletteCache.set(course.code, palette);
+  return palette;
 }
 
 export function getCourseColor(course: Course): string {
