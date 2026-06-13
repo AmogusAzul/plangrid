@@ -5,6 +5,8 @@ personal planning. It behaves like a flexible whiteboard: courses can be
 searched, placed on a credit grid, moved between semesters, stored for later,
 and shared without creating an account.
 
+[Open PlanGrid](https://amogusazul.github.io/plangrid/)
+
 PlanGrid is an unofficial tool. It does not validate prerequisites or official
 degree requirements.
 
