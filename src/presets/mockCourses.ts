@@ -33,6 +33,14 @@ export const requirementCourses: Course[] = [
   },
 ];
 
+const requirementCourseCodes = new Set(
+  requirementCourses.map((course) => course.code),
+);
+
+export function isRequirementCourseCode(code: string): boolean {
+  return requirementCourseCodes.has(code.trim().toUpperCase());
+}
+
 export const mockCourses: Course[] = [
   ...requirementCourses,
   {

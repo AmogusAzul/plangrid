@@ -1,6 +1,7 @@
 import type { PlannedCourse } from "../models/course";
 import type { StudyPlan } from "../models/studyPlan";
 import type { PlanWarning } from "../models/warning";
+import { isRequirementCourseCode } from "../presets/mockCourses";
 
 export function sumCredits(courses: PlannedCourse[]): number {
   return courses.reduce((total, course) => total + course.credits, 0);
@@ -43,7 +44,7 @@ export function validatePlan(plan: StudyPlan): PlanWarning[] {
   }
 
   for (const [code, courses] of coursesByCode) {
-    if (courses.length > 1) {
+    if (courses.length > 1 && !isRequirementCourseCode(code)) {
       warnings.push({
         id: `duplicate-${code}`,
         severity: "warning",

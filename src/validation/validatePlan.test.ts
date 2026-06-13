@@ -21,6 +21,32 @@ describe("validatePlan", () => {
     );
   });
 
+  it("allows mock study-plan requirements to appear more than once", () => {
+    const plan = createBlankPlan(1);
+    const requirements = [
+      ["CBUX-0000", "CBU", 3],
+      ["CLEX-0000", "Creditos de Libre Eleccion", 3],
+      ["ECXX-0000", "Electiva Cientifica", 3],
+      ["EING-0000", "Electiva de Ingenieria", 2],
+      ["EPXX-0000", "Electiva Profesional", 4],
+    ] as const;
+
+    requirements.forEach(([code, name, credits], index) => {
+      const requirement = {
+        id: `semester-${index}`,
+        code,
+        name,
+        credits,
+      };
+      plan.semesters[0].courses.push(requirement);
+      plan.storage.push({ ...requirement, id: `storage-${index}` });
+    });
+
+    expect(
+      validatePlan(plan).filter((warning) => warning.id.startsWith("duplicate-")),
+    ).toEqual([]);
+  });
+
   it("warns when a semester exceeds its credit limit", () => {
     const plan = createBlankPlan(1);
     plan.creditLimitPerSemester = 2;
