@@ -4,7 +4,7 @@ export const requirementCourses: Course[] = [
   {
     code: "CBUX-0000",
     name: "CBU",
-    credits: 2,
+    credits: 3,
     department: "CBUX",
   },
   {
@@ -28,7 +28,7 @@ export const requirementCourses: Course[] = [
   {
     code: "EPXX-0000",
     name: "Electiva Profesional",
-    credits: 3,
+    credits: 4,
     department: "EPXX",
   },
 ];
