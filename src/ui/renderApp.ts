@@ -19,7 +19,7 @@ import {
 import { getCourseColor, getCoursePalette } from "./courseColor";
 import {
   COURSE_DRAG_TYPE,
-  getGrabOffsetWithinSpan,
+  getGrabOffsetRatio,
   getSnappedCourseStart,
   parseCourseDrag,
   serializeCourseDrag,
@@ -463,7 +463,7 @@ export function renderApp(
     zone: HTMLElement,
     event: DragEvent,
     span: number,
-    grabOffset: number,
+    grabOffsetRatio: number,
   ): number {
     const styles = getComputedStyle(zone);
     const bounds = zone.getBoundingClientRect();
@@ -475,19 +475,17 @@ export function renderApp(
       Number(zone.dataset.gridColumns) || SEMESTER_GRID_COLUMNS,
     );
     const contentWidth = bounds.width - paddingLeft - paddingRight;
-    const cellWidth =
-      (contentWidth - columnGap * (gridColumns - 1)) / gridColumns;
     const x = Math.max(
       0,
       Math.min(contentWidth - 1, event.clientX - bounds.left - paddingLeft),
     );
-    const pointerColumn =
-      Math.floor(x / Math.max(1, cellWidth + columnGap)) + 1;
     const column = getSnappedCourseStart(
-      pointerColumn,
+      x,
+      contentWidth,
       gridColumns,
       span,
-      grabOffset,
+      columnGap,
+      grabOffsetRatio,
     );
 
     return column;
@@ -512,15 +510,13 @@ export function renderApp(
   function getGrabOffset(
     event: DragEvent,
     element: HTMLElement,
-    span: number,
   ): number {
     const bounds = element.getBoundingClientRect();
     if (bounds.width <= 0) return 0;
 
-    return getGrabOffsetWithinSpan(
+    return getGrabOffsetRatio(
       event.clientX - bounds.left,
       bounds.width,
-      span,
     );
   }
 
@@ -544,18 +540,10 @@ export function renderApp(
     card.addEventListener("dragstart", (event) => {
       const courseId = card.dataset.courseId;
       if (!courseId) return;
-      const course = [
-        ...plan.semesters.flatMap((semester) => semester.courses),
-        ...plan.storage,
-      ].find((entry) => entry.id === courseId);
-      const span = Math.min(
-        SEMESTER_GRID_COLUMNS,
-        Math.max(1, course?.credits ?? 1),
-      );
       beginDrag(event, card, {
         kind: "planned-course",
         courseId,
-        grabOffset: getGrabOffset(event, card, span),
+        grabOffsetRatio: getGrabOffset(event, card),
       });
     });
     card.addEventListener("dragend", clearDragStyles);
@@ -565,14 +553,10 @@ export function renderApp(
     result.addEventListener("dragstart", (event) => {
       const courseCode = result.dataset.catalogCourse;
       if (!courseCode) return;
-      const span = Math.min(
-        SEMESTER_GRID_COLUMNS,
-        Math.max(1, availableCourses.get(courseCode)?.credits ?? 1),
-      );
       beginDrag(event, result, {
         kind: "catalog-course",
         courseCode,
-        grabOffset: getGrabOffset(event, result, span),
+        grabOffsetRatio: getGrabOffset(event, result),
       });
     });
     result.addEventListener("dragend", clearDragStyles);
@@ -592,7 +576,7 @@ export function renderApp(
           zone,
           event,
           span,
-          Math.min(span - 1, activeDrag.grabOffset),
+          activeDrag.grabOffsetRatio,
         );
         zone.dataset.dropSlot = String(slotStart);
         showDropSlot(zone, slotStart, span);

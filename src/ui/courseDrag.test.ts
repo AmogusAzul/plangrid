@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  getGrabOffsetWithinSpan,
+  getGrabOffsetRatio,
   getSnappedCourseStart,
   parseCourseDrag,
   serializeCourseDrag,
@@ -11,12 +11,12 @@ describe("courseDrag", () => {
     const planned = {
       kind: "planned-course",
       courseId: "local-id",
-      grabOffset: 2,
+      grabOffsetRatio: 0.82,
     } as const;
     const catalog = {
       kind: "catalog-course",
       courseCode: "ISIS-1225",
-      grabOffset: 1,
+      grabOffsetRatio: 0.35,
     } as const;
 
     expect(parseCourseDrag(serializeCourseDrag(planned))).toEqual(planned);
@@ -29,15 +29,29 @@ describe("courseDrag", () => {
     expect(parseCourseDrag('{"kind":"other","courseId":"x"}')).toBeNull();
   });
 
-  it("maps the grabbed point to a course-cell offset", () => {
-    expect(getGrabOffsetWithinSpan(1, 90, 3)).toBe(0);
-    expect(getGrabOffsetWithinSpan(45, 90, 3)).toBe(1);
-    expect(getGrabOffsetWithinSpan(89, 90, 3)).toBe(2);
+  it("preserves the continuous grab offset from the card origin", () => {
+    expect(getGrabOffsetRatio(1, 90)).toBeCloseTo(1 / 90);
+    expect(getGrabOffsetRatio(45, 90)).toBe(0.5);
+    expect(getGrabOffsetRatio(89, 90)).toBeCloseTo(89 / 90);
   });
 
-  it("keeps the grabbed cell under the pointer after snapping", () => {
-    expect(getSnappedCourseStart(10, 21, 3, 0)).toBe(10);
-    expect(getSnappedCourseStart(10, 21, 3, 2)).toBe(8);
-    expect(getSnappedCourseStart(21, 21, 3, 2)).toBe(19);
+  it("subtracts the continuous offset before snapping the card origin", () => {
+    const contentWidth = 210;
+
+    expect(
+      getSnappedCourseStart(95, contentWidth, 21, 3, 0, 0),
+    ).toBe(11);
+    expect(
+      getSnappedCourseStart(95, contentWidth, 21, 3, 0, 0.5),
+    ).toBe(9);
+    expect(
+      getSnappedCourseStart(95, contentWidth, 21, 3, 0, 1),
+    ).toBe(8);
+  });
+
+  it("accounts for grid gaps before snapping", () => {
+    expect(
+      getSnappedCourseStart(110, 250, 21, 3, 2, 0.75),
+    ).toBe(8);
   });
 });

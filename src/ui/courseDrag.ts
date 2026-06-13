@@ -4,49 +4,54 @@ export type CourseDragPayload =
   | {
       kind: "planned-course";
       courseId: string;
-      grabOffset: number;
+      grabOffsetRatio: number;
     }
   | {
       kind: "catalog-course";
       courseCode: string;
-      grabOffset: number;
+      grabOffsetRatio: number;
     };
 
 export function serializeCourseDrag(payload: CourseDragPayload): string {
   return JSON.stringify(payload);
 }
 
-export function getGrabOffsetWithinSpan(
+export function getGrabOffsetRatio(
   relativeX: number,
   width: number,
-  span: number,
 ): number {
-  const safeSpan = Math.max(1, Math.trunc(span));
   if (width <= 0) return 0;
 
-  const position = Math.max(0, Math.min(width - 1, relativeX));
-  return Math.min(
-    safeSpan - 1,
-    Math.floor((position / width) * safeSpan),
-  );
+  return Math.max(0, Math.min(1, relativeX / width));
 }
 
 export function getSnappedCourseStart(
-  pointerColumn: number,
+  pointerX: number,
+  contentWidth: number,
   gridColumns: number,
   span: number,
-  grabOffset: number,
+  columnGap: number,
+  grabOffsetRatio: number,
 ): number {
   const safeSpan = Math.max(1, Math.trunc(span));
   const safeColumns = Math.max(safeSpan, Math.trunc(gridColumns));
-  const offset = Math.min(
-    safeSpan - 1,
-    Math.max(0, Math.trunc(grabOffset)),
+  const safeGap = Math.max(0, columnGap);
+  const cellWidth =
+    (contentWidth - safeGap * (safeColumns - 1)) / safeColumns;
+  const columnPitch = cellWidth + safeGap;
+  const courseWidth = cellWidth * safeSpan + safeGap * (safeSpan - 1);
+  const offsetRatio = Math.max(
+    0,
+    Math.min(1, grabOffsetRatio),
+  );
+  const prospectiveLeft = pointerX - offsetRatio * courseWidth;
+  const snappedColumnIndex = Math.round(
+    prospectiveLeft / Math.max(1, columnPitch),
   );
 
   return Math.min(
     safeColumns - safeSpan + 1,
-    Math.max(1, Math.trunc(pointerColumn) - offset),
+    Math.max(1, snappedColumnIndex + 1),
   );
 }
 
@@ -60,14 +65,15 @@ export function parseCourseDrag(value: string): CourseDragPayload | null {
       candidate.kind === "planned-course" &&
       typeof candidate.courseId === "string" &&
       candidate.courseId.length > 0 &&
-      typeof candidate.grabOffset === "number" &&
-      Number.isInteger(candidate.grabOffset) &&
-      candidate.grabOffset >= 0
+      typeof candidate.grabOffsetRatio === "number" &&
+      Number.isFinite(candidate.grabOffsetRatio) &&
+      candidate.grabOffsetRatio >= 0 &&
+      candidate.grabOffsetRatio <= 1
     ) {
       return {
         kind: candidate.kind,
         courseId: candidate.courseId,
-        grabOffset: candidate.grabOffset,
+        grabOffsetRatio: candidate.grabOffsetRatio,
       };
     }
 
@@ -75,14 +81,15 @@ export function parseCourseDrag(value: string): CourseDragPayload | null {
       candidate.kind === "catalog-course" &&
       typeof candidate.courseCode === "string" &&
       candidate.courseCode.length > 0 &&
-      typeof candidate.grabOffset === "number" &&
-      Number.isInteger(candidate.grabOffset) &&
-      candidate.grabOffset >= 0
+      typeof candidate.grabOffsetRatio === "number" &&
+      Number.isFinite(candidate.grabOffsetRatio) &&
+      candidate.grabOffsetRatio >= 0 &&
+      candidate.grabOffsetRatio <= 1
     ) {
       return {
         kind: candidate.kind,
         courseCode: candidate.courseCode,
-        grabOffset: candidate.grabOffset,
+        grabOffsetRatio: candidate.grabOffsetRatio,
       };
     }
 
