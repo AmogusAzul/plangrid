@@ -5,7 +5,6 @@ export const SEMESTER_GRID_COLUMNS = 21;
 export type PositionedCourse = {
   course: PlannedCourse;
   slotStart: number;
-  row: number;
   column: number;
   span: number;
 };
@@ -14,21 +13,6 @@ function courseSpan(course: PlannedCourse): number {
   return Math.min(
     SEMESTER_GRID_COLUMNS,
     Math.max(1, Math.trunc(course.credits)),
-  );
-}
-
-function alignToRow(slotStart: number, span: number): number {
-  const safeStart = Math.max(1, Math.trunc(slotStart));
-  const column = ((safeStart - 1) % SEMESTER_GRID_COLUMNS) + 1;
-
-  if (column + span - 1 <= SEMESTER_GRID_COLUMNS) {
-    return safeStart;
-  }
-
-  return (
-    Math.floor((safeStart - 1) / SEMESTER_GRID_COLUMNS + 1) *
-      SEMESTER_GRID_COLUMNS +
-    1
   );
 }
 
@@ -48,14 +32,14 @@ function firstOpenSlot(
   span: number,
   positioned: PositionedCourse[],
 ): number {
-  let candidate = alignToRow(requestedSlot, span);
+  let candidate = Math.max(1, Math.trunc(requestedSlot));
 
   while (
     positioned.some((entry) =>
       rangesOverlap(candidate, span, entry.slotStart, entry.span),
     )
   ) {
-    candidate = alignToRow(candidate + 1, span);
+    candidate += 1;
   }
 
   return candidate;
@@ -80,13 +64,27 @@ export function positionSemesterCourses(
     positioned.push({
       course,
       slotStart,
-      row: Math.floor((slotStart - 1) / SEMESTER_GRID_COLUMNS) + 1,
-      column: ((slotStart - 1) % SEMESTER_GRID_COLUMNS) + 1,
+      column: slotStart,
       span,
     });
   }
 
   return positioned;
+}
+
+export function getSemesterGridColumns(
+  courses: PlannedCourse[],
+  creditLimit: number,
+): number {
+  const positioned = positionSemesterCourses(courses);
+  const occupiedColumns =
+    positioned.length === 0
+      ? 0
+      : Math.max(
+          ...positioned.map((entry) => entry.slotStart + entry.span - 1),
+        );
+
+  return Math.max(1, Math.trunc(creditLimit), occupiedColumns);
 }
 
 export function normalizeSemesterCourses(

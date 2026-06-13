@@ -52,6 +52,8 @@ working directory.
 - Immediate autosave, totals, and warning updates after every drop
 - Cell-snapped semester placement with persistent gaps and collision shifting
 - Backward-compatible migration of older array-only saved plans
+- Single-row semester grids that compress all configured and overflow cells
+- Grab-point-aware dragging so the held card cell stays under the pointer
 
 The course API is public but unofficially documented. If it is unavailable,
 PlanGrid displays a small set of development fallback courses instead of

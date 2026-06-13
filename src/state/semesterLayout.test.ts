@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PlannedCourse } from "../models/course";
 import {
+  getSemesterGridColumns,
   insertCourseAtSlot,
   normalizeSemesterCourses,
   positionSemesterCourses,
@@ -69,11 +70,16 @@ describe("semesterLayout", () => {
     ]);
   });
 
-  it("wraps cards that would cross the 21-column boundary", () => {
+  it("keeps overflow cards on the same linear row", () => {
     const positioned = positionSemesterCourses([course("A", 4, 20)]);
 
     expect(positioned[0]).toEqual(
-      expect.objectContaining({ row: 2, column: 1, slotStart: 22 }),
+      expect.objectContaining({ column: 20, slotStart: 20 }),
     );
+  });
+
+  it("expands the single row when occupied slots exceed the credit limit", () => {
+    expect(getSemesterGridColumns([course("A", 4, 20)], 21)).toBe(23);
+    expect(getSemesterGridColumns([course("A", 3, 1)], 21)).toBe(21);
   });
 });

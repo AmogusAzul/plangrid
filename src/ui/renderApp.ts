@@ -6,6 +6,7 @@ import { STORAGE_DESTINATION } from "../state/courseDestination";
 import { addCourse, deleteCourse, moveCourse } from "../state/planCourses";
 import { resizeSemesters } from "../state/planFactory";
 import {
+  getSemesterGridColumns,
   positionSemesterCourses,
   SEMESTER_GRID_COLUMNS,
   type PositionedCourse,
@@ -18,6 +19,8 @@ import {
 import { getCourseColor, getCoursePalette } from "./courseColor";
 import {
   COURSE_DRAG_TYPE,
+  getGrabOffsetWithinSpan,
+  getSnappedCourseStart,
   parseCourseDrag,
   serializeCourseDrag,
   type CourseDragPayload,
@@ -58,7 +61,7 @@ function courseCard(
   return `
     <article
       class="course-card"
-      style="--course-span: ${position?.span ?? Math.max(1, course.credits)}; --course-column: ${position?.column ?? 1}; --course-row: ${position?.row ?? 1}; --course-color: ${palette.background}"
+      style="--course-span: ${position?.span ?? Math.max(1, course.credits)}; --course-column: ${position?.column ?? 1}; --course-color: ${palette.background}"
       data-course-id="${escapeHtml(course.id)}"
       draggable="true"
       title="Drag to another semester or storage"
@@ -286,6 +289,11 @@ export function renderApp(
                 100,
                 (credits / plan.creditLimitPerSemester) * 100,
               );
+              const positions = positionSemesterCourses(semester.courses);
+              const gridColumns = getSemesterGridColumns(
+                semester.courses,
+                plan.creditLimitPerSemester,
+              );
 
               return `
                 <article class="semester-row ${hasWarning ? "semester-row--warning" : ""}">
@@ -306,13 +314,14 @@ export function renderApp(
                   </header>
                   <div
                     class="semester-track drop-zone"
+                    style="--grid-columns: ${gridColumns}"
                     data-drop-destination="${escapeHtml(semester.id)}"
+                    data-grid-columns="${gridColumns}"
                     aria-label="${escapeHtml(semester.label)} course drop zone"
                   >
                     ${
                       semester.courses.length > 0
-                        ? positionSemesterCourses(semester.courses)
-                            .map((position) =>
+                        ? positions.map((position) =>
                               courseCard(
                                 position.course,
                                 duplicatedCodes,
@@ -320,8 +329,7 @@ export function renderApp(
                                 true,
                                 position,
                               ),
-                            )
-                            .join("")
+                            ).join("")
                         : '<p class="semester-empty">Drop courses here</p>'
                     }
                   </div>
@@ -455,37 +463,34 @@ export function renderApp(
     zone: HTMLElement,
     event: DragEvent,
     span: number,
+    grabOffset: number,
   ): number {
     const styles = getComputedStyle(zone);
     const bounds = zone.getBoundingClientRect();
     const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
     const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
-    const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
     const columnGap = Number.parseFloat(styles.columnGap) || 0;
-    const rowGap = Number.parseFloat(styles.rowGap) || 0;
-    const rowHeight =
-      Number.parseFloat(styles.getPropertyValue("--course-row-height")) || 76;
+    const gridColumns = Math.max(
+      1,
+      Number(zone.dataset.gridColumns) || SEMESTER_GRID_COLUMNS,
+    );
     const contentWidth = bounds.width - paddingLeft - paddingRight;
     const cellWidth =
-      (contentWidth - columnGap * (SEMESTER_GRID_COLUMNS - 1)) /
-      SEMESTER_GRID_COLUMNS;
+      (contentWidth - columnGap * (gridColumns - 1)) / gridColumns;
     const x = Math.max(
       0,
       Math.min(contentWidth - 1, event.clientX - bounds.left - paddingLeft),
     );
-    const y = Math.max(0, event.clientY - bounds.top - paddingTop);
-    const rawColumn =
+    const pointerColumn =
       Math.floor(x / Math.max(1, cellWidth + columnGap)) + 1;
-    const column = Math.min(
-      SEMESTER_GRID_COLUMNS - span + 1,
-      Math.max(1, rawColumn),
-    );
-    const row = Math.max(
-      1,
-      Math.floor(y / Math.max(1, rowHeight + rowGap)) + 1,
+    const column = getSnappedCourseStart(
+      pointerColumn,
+      gridColumns,
+      span,
+      grabOffset,
     );
 
-    return (row - 1) * SEMESTER_GRID_COLUMNS + column;
+    return column;
   }
 
   function showDropSlot(
@@ -501,10 +506,22 @@ export function renderApp(
       zone.append(indicator);
     }
 
-    const row = Math.floor((slotStart - 1) / SEMESTER_GRID_COLUMNS) + 1;
-    const column = ((slotStart - 1) % SEMESTER_GRID_COLUMNS) + 1;
-    indicator.style.gridColumn = `${column} / span ${span}`;
-    indicator.style.gridRow = String(row);
+    indicator.style.gridColumn = `${slotStart} / span ${span}`;
+  }
+
+  function getGrabOffset(
+    event: DragEvent,
+    element: HTMLElement,
+    span: number,
+  ): number {
+    const bounds = element.getBoundingClientRect();
+    if (bounds.width <= 0) return 0;
+
+    return getGrabOffsetWithinSpan(
+      event.clientX - bounds.left,
+      bounds.width,
+      span,
+    );
   }
 
   function beginDrag(
@@ -527,7 +544,19 @@ export function renderApp(
     card.addEventListener("dragstart", (event) => {
       const courseId = card.dataset.courseId;
       if (!courseId) return;
-      beginDrag(event, card, { kind: "planned-course", courseId });
+      const course = [
+        ...plan.semesters.flatMap((semester) => semester.courses),
+        ...plan.storage,
+      ].find((entry) => entry.id === courseId);
+      const span = Math.min(
+        SEMESTER_GRID_COLUMNS,
+        Math.max(1, course?.credits ?? 1),
+      );
+      beginDrag(event, card, {
+        kind: "planned-course",
+        courseId,
+        grabOffset: getGrabOffset(event, card, span),
+      });
     });
     card.addEventListener("dragend", clearDragStyles);
   });
@@ -536,7 +565,15 @@ export function renderApp(
     result.addEventListener("dragstart", (event) => {
       const courseCode = result.dataset.catalogCourse;
       if (!courseCode) return;
-      beginDrag(event, result, { kind: "catalog-course", courseCode });
+      const span = Math.min(
+        SEMESTER_GRID_COLUMNS,
+        Math.max(1, availableCourses.get(courseCode)?.credits ?? 1),
+      );
+      beginDrag(event, result, {
+        kind: "catalog-course",
+        courseCode,
+        grabOffset: getGrabOffset(event, result, span),
+      });
     });
     result.addEventListener("dragend", clearDragStyles);
   });
@@ -551,7 +588,12 @@ export function renderApp(
 
       if (zone.dataset.dropDestination !== STORAGE_DESTINATION) {
         const span = getDraggedCourseSpan(activeDrag);
-        const slotStart = getDropSlot(zone, event, span);
+        const slotStart = getDropSlot(
+          zone,
+          event,
+          span,
+          Math.min(span - 1, activeDrag.grabOffset),
+        );
         zone.dataset.dropSlot = String(slotStart);
         showDropSlot(zone, slotStart, span);
       }
