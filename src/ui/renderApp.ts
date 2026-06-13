@@ -33,9 +33,12 @@ import {
 type AppActions = {
   updatePlan: (update: (plan: StudyPlan) => StudyPlan) => void;
   resetPlan: () => void;
+  exportPNG: (root: string) => void;
   setCourseDestination: (destination: string) => void;
   search: (query: string) => Promise<void>;
 };
+
+const mainClass: string = "planner";
 
 function escapeHtml(value: string): string {
   return value
@@ -159,6 +162,7 @@ export function renderApp(
         </a>
         <div class="header-actions">
           <span class="save-status">Saved locally</span>
+          <button class="button button--ghost" id="export-png">Export PNG</button>
           <button class="button button--ghost" id="reset-plan">Reset plan</button>
         </div>
       </header>
@@ -258,7 +262,7 @@ export function renderApp(
 
       </aside>
 
-      <main class="planner">
+      <main class="${mainClass}">
         <section class="planner-toolbar">
           <label class="roadmap-title" for="plan-name">
             <span class="eyebrow">Academic roadmap</span>
@@ -694,4 +698,9 @@ export function renderApp(
       actions.resetPlan();
     }
   });
+
+  root.querySelector<HTMLButtonElement>("#export-png")?.addEventListener("click", () => {
+      actions.exportPNG(mainClass);
+  });
+
 }

@@ -11,6 +11,7 @@ import {
 import { createBlankPlan } from "./state/planFactory";
 import { loadPlan, savePlan, STORAGE_KEY } from "./state/planStorage";
 import { renderApp } from "./ui/renderApp";
+import { exportPlanPNG } from "./export/pngExport";
 
 const root = document.querySelector<HTMLElement>("#app");
 
@@ -37,6 +38,9 @@ function render(): void {
       plan = savePlan(createBlankPlan());
       courseDestination = getDefaultCourseDestination(plan);
       render();
+    },
+    exportPNG(root: string) {
+      exportPlanPNG(root);
     },
     setCourseDestination(destination) {
       courseDestination = normalizeCourseDestination(plan, destination);
