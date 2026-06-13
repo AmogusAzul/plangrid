@@ -160,10 +160,23 @@ export function renderApp(
   root.innerHTML = `
     <div class="app-shell">
       <header class="app-header">
-        <a class="brand" href="#" aria-label="PlanGrid home">
+        <a
+          class="brand"
+          href="https://github.com/AmogusAzul/plangrid"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Open the PlanGrid GitHub repository"
+        >
           <span class="brand__mark">PG</span>
           <span>PlanGrid</span>
         </a>
+        <button
+          class="help-button"
+          id="open-help"
+          type="button"
+          aria-label="What is PlanGrid and how is it used?"
+          title="About PlanGrid"
+        >?</button>
         <div class="header-actions">
           <span class="save-status">Autosaved locally</span>
           <button class="button button--ghost" id="export-png">Export PNG</button>
@@ -173,6 +186,64 @@ export function renderApp(
           <button class="button button--ghost button--danger" id="reset-plan">Reset</button>
         </div>
       </header>
+
+      <dialog class="help-dialog" id="help-dialog" aria-labelledby="help-title">
+        <div class="help-dialog__header">
+          <div>
+            <span class="eyebrow">PlanGrid guide</span>
+            <h2 id="help-title">What is PlanGrid?</h2>
+          </div>
+          <button class="help-dialog__close" id="close-help" type="button" aria-label="Close guide">Close</button>
+        </div>
+        <div class="help-tabs" role="tablist" aria-label="Guide language">
+          <button
+            class="help-tab help-tab--active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="help-english"
+            data-help-language="english"
+          >English</button>
+          <button
+            class="help-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="help-spanish"
+            data-help-language="spanish"
+          >Español</button>
+        </div>
+        <section class="help-content" id="help-english" data-help-panel="english" role="tabpanel">
+          <p>
+            PlanGrid is an unofficial academic planning whiteboard. It helps students
+            and advisors explore semester-by-semester plans; it does not certify degree
+            requirements.
+          </p>
+          <ol>
+            <li>Start with a blank plan or a preset.</li>
+            <li>Search for courses by code, name, or a requirement such as CBU or EP.</li>
+            <li>Add or drag cards into semesters, exact credit cells, or Storage.</li>
+            <li>Edit the title, periods, semester count, and credit limit directly.</li>
+            <li>Review warnings, then export an editable .plan file or a shareable PNG.</li>
+          </ol>
+          <p>Your work is autosaved only in this browser.</p>
+        </section>
+        <section class="help-content" id="help-spanish" data-help-panel="spanish" role="tabpanel" hidden>
+          <p>
+            PlanGrid es un tablero no oficial de planeación académica. Ayuda a
+            estudiantes y consejeros a explorar planes semestre por semestre; no
+            certifica requisitos de grado.
+          </p>
+          <ol>
+            <li>Empieza con un plan vacío o una plantilla.</li>
+            <li>Busca cursos por código, nombre o un requisito como CBU o EP.</li>
+            <li>Agrega o arrastra tarjetas a semestres, celdas de crédito o Storage.</li>
+            <li>Edita directamente el título, los periodos, semestres y límite de créditos.</li>
+            <li>Revisa las alertas y exporta un archivo .plan editable o una imagen PNG.</li>
+          </ol>
+          <p>Tu trabajo se guarda automáticamente únicamente en este navegador.</p>
+        </section>
+      </dialog>
 
       <aside class="sidebar">
         <section class="panel warnings-panel" aria-live="polite">
@@ -729,6 +800,39 @@ export function renderApp(
     if (window.confirm("Reset the current plan and remove the local autosave?")) {
       actions.resetPlan();
     }
+  });
+
+  const helpDialog =
+    root.querySelector<HTMLDialogElement>("#help-dialog");
+
+  root.querySelector<HTMLButtonElement>("#open-help")?.addEventListener("click", () => {
+    helpDialog?.showModal();
+  });
+
+  root.querySelector<HTMLButtonElement>("#close-help")?.addEventListener("click", () => {
+    helpDialog?.close();
+  });
+
+  helpDialog?.addEventListener("click", (event) => {
+    if (event.target === helpDialog) {
+      helpDialog.close();
+    }
+  });
+
+  root.querySelectorAll<HTMLButtonElement>("[data-help-language]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const language = button.dataset.helpLanguage;
+      if (!language) return;
+
+      root.querySelectorAll<HTMLButtonElement>("[data-help-language]").forEach((tab) => {
+        const isActive = tab.dataset.helpLanguage === language;
+        tab.classList.toggle("help-tab--active", isActive);
+        tab.setAttribute("aria-selected", String(isActive));
+      });
+      root.querySelectorAll<HTMLElement>("[data-help-panel]").forEach((panel) => {
+        panel.hidden = panel.dataset.helpPanel !== language;
+      });
+    });
   });
 
   root.querySelector<HTMLButtonElement>("#export-png")?.addEventListener("click", () => {

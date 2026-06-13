@@ -10,6 +10,9 @@ and shared without creating an account.
 PlanGrid is an unofficial tool. It does not validate prerequisites or official
 degree requirements.
 
+The `?` button beside the PlanGrid brand opens a short English/Spanish guide
+inside the application. The brand itself links back to this repository.
+
 ## Features
 
 - Editable semester count, term sequence, plan name, and credit limit
