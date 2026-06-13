@@ -4,6 +4,7 @@ import {
   getCourseByCode,
   normalizeCourseOfferings,
   parseCourseSearchInput,
+  searchRequirementCourses,
   searchCourses,
 } from "./courseApi";
 
@@ -111,6 +112,43 @@ describe("courseApi", () => {
     await expect(getCourseByCode("isis 1225", fetchApi)).resolves.toEqual(
       expect.objectContaining({ code: "ISIS-1225" }),
     );
+  });
+
+  it("searches local study-plan requirements by acronym and partial name", () => {
+    expect(searchRequirementCourses("CBU")[0]).toEqual(
+      expect.objectContaining({ code: "CBUX-0000", credits: 2 }),
+    );
+    expect(searchRequirementCourses("EP")[0]).toEqual(
+      expect.objectContaining({ code: "EPXX-0000" }),
+    );
+    expect(searchRequirementCourses("Electiva Prof")[0]).toEqual(
+      expect.objectContaining({
+        code: "EPXX-0000",
+        name: "Electiva Profesional",
+      }),
+    );
+    expect(searchRequirementCourses("creditos libre")).toEqual([
+      expect.objectContaining({ code: "CLEX-0000" }),
+    ]);
+  });
+
+  it("returns matching requirements even when the live API fails", async () => {
+    const fetchApi = vi.fn(async () => {
+      throw new TypeError("network unavailable");
+    });
+
+    await expect(searchCourses("Electiva Prof", fetchApi)).resolves.toEqual([
+      expect.objectContaining({ code: "EPXX-0000" }),
+    ]);
+  });
+
+  it("hydrates requirement codes without calling the live API", async () => {
+    const fetchApi = vi.fn();
+
+    await expect(getCourseByCode("CBUX-0000", fetchApi)).resolves.toEqual(
+      expect.objectContaining({ name: "CBU", credits: 2 }),
+    );
+    expect(fetchApi).not.toHaveBeenCalled();
   });
 
   it("turns request failures into adapter errors", async () => {

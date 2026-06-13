@@ -1,4 +1,5 @@
 import type { Course } from "../models/course";
+import { requirementCourses } from "../presets/mockCourses";
 
 export const COURSE_API_URL =
   "https://ofertadecursos.uniandes.edu.co/api/courses";
@@ -160,7 +161,35 @@ async function fetchCoursePage(
 }
 
 function normalizeComparableText(value: string): string {
-  return value.trim().toLocaleUpperCase("es-CO");
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLocaleUpperCase("es-CO");
+}
+
+function localSearchTerms(course: Course): string[] {
+  const acronym = course.code.split("-", 1)[0].replaceAll("X", "");
+  return [
+    course.code,
+    course.name,
+    course.department ?? "",
+    acronym,
+  ].map(normalizeComparableText);
+}
+
+export function searchRequirementCourses(query: string): Course[] {
+  const normalizedQuery = normalizeComparableText(query);
+  if (!normalizedQuery) return [];
+  const queryTokens = normalizedQuery.split(/\s+/);
+
+  return requirementCourses.filter((course) =>
+    localSearchTerms(course).some(
+      (term) =>
+        term.includes(normalizedQuery) ||
+        queryTokens.every((token) => term.includes(token)),
+    ),
+  );
 }
 
 function rankCourses(courses: Course[], input: string): Course[] {
@@ -184,6 +213,7 @@ export async function searchCourses(
 ): Promise<Course[]> {
   if (!query.trim()) return [];
 
+  const localMatches = searchRequirementCourses(query);
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort(), 12_000);
   const parsedInput = parseCourseSearchInput(query);
@@ -205,11 +235,23 @@ export async function searchCourses(
 
       if (pageRows.length < PAGE_SIZE) break;
     }
+  } catch (error) {
+    if (localMatches.length > 0) {
+      return rankCourses(localMatches, query);
+    }
+    throw error;
   } finally {
     globalThis.clearTimeout(timeout);
   }
 
-  return rankCourses(normalizeCourseOfferings(rows), query);
+  const merged = new Map(
+    [...localMatches, ...normalizeCourseOfferings(rows)].map((course) => [
+      course.code,
+      course,
+    ]),
+  );
+
+  return rankCourses([...merged.values()], query);
 }
 
 export async function getCourseByCode(
@@ -220,6 +262,11 @@ export async function getCourseByCode(
   const normalizedCode = parsedCode.prefix
     ? `${parsedCode.prefix}-${parsedCode.query}`
     : code.trim().toUpperCase().replace(/\s+/, "-");
+  const localCourse = requirementCourses.find(
+    (course) => course.code === normalizedCode,
+  );
+  if (localCourse) return localCourse;
+
   const courses = await searchCourses(normalizedCode, fetchApi);
 
   return courses.find((course) => course.code === normalizedCode) ?? null;

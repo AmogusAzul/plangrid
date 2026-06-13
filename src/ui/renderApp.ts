@@ -139,7 +139,7 @@ function searchContent(search: CourseSearchState): string {
     `;
   }
 
-  return '<p class="search-status">Search by code or course name to add a course.</p>';
+  return '<p class="search-status">Search by code, name, or requirement such as CBU, CLE, EC, EING, or EP.</p>';
 }
 
 export function renderApp(
@@ -233,14 +233,14 @@ export function renderApp(
             </div>
           </div>
           <form class="course-search" id="course-search-form">
-            <label for="course-query">Course code or name</label>
+            <label for="course-query">Course code, name, or requirement</label>
             <div>
               <input
                 id="course-query"
                 name="query"
                 type="search"
                 value="${escapeHtml(search.query)}"
-                placeholder="ISIS-1225 or estructuras"
+                placeholder="ISIS-1225, estructuras, or EP"
                 autocomplete="off"
                 required
               />

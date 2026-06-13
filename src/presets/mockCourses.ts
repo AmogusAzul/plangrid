@@ -1,6 +1,40 @@
 import type { Course } from "../models/course";
 
+export const requirementCourses: Course[] = [
+  {
+    code: "CBUX-0000",
+    name: "CBU",
+    credits: 2,
+    department: "CBUX",
+  },
+  {
+    code: "CLEX-0000",
+    name: "Creditos de Libre Eleccion",
+    credits: 3,
+    department: "CLEX",
+  },
+  {
+    code: "ECXX-0000",
+    name: "Electiva Cientifica",
+    credits: 3,
+    department: "ECXX",
+  },
+  {
+    code: "EING-0000",
+    name: "Electiva de Ingenieria",
+    credits: 3,
+    department: "EING",
+  },
+  {
+    code: "EPXX-0000",
+    name: "Electiva Profesional",
+    credits: 3,
+    department: "EPXX",
+  },
+];
+
 export const mockCourses: Course[] = [
+  ...requirementCourses,
   {
     code: "ISIS-1204",
     name: "Algoritmica y Programacion Orientada por Objetos I",
@@ -38,4 +72,3 @@ export const mockCourses: Course[] = [
     department: "CBCC",
   },
 ];
-
