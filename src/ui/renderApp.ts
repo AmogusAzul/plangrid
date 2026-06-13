@@ -5,9 +5,9 @@ import { mockCourses } from "../presets/mockCourses";
 import { STORAGE_DESTINATION } from "../state/courseDestination";
 import { addCourse, deleteCourse, moveCourse } from "../state/planCourses";
 import {
-  cascadeSemesterTerms,
   isRegularTerm,
   resizeSemesters,
+  updateSemesterTerm,
 } from "../state/planFactory";
 import {
   getSemesterGridColumns,
@@ -262,7 +262,12 @@ export function renderApp(
         <section class="planner-toolbar">
           <label class="roadmap-title" for="plan-name">
             <span class="eyebrow">Academic roadmap - edit plan name</span>
-            <input id="plan-name" value="${escapeHtml(plan.name)}" aria-label="Plan name" />
+            <input
+              id="plan-name"
+              value="${escapeHtml(plan.name)}"
+              size="${Math.max(8, plan.name.length)}"
+              aria-label="Plan name"
+            />
           </label>
           <div class="plan-stats">
             <div><strong>${getTotalPlanCredits(plan)}</strong><span>Total credits</span></div>
@@ -299,20 +304,17 @@ export function renderApp(
               return `
                 <article class="semester-row ${hasWarning ? "semester-row--warning" : ""}">
                   <header class="semester-meta">
-                    ${
-                      semesterIndex === 0
-                        ? `<label class="semester-term-editor">
-                            <span>Edit first period</span>
-                            <input
-                              id="first-semester-term"
-                              value="${escapeHtml(semester.termHint)}"
-                              pattern="\\d{4}-(10|20)"
-                              title="Use a regular term in YYYY-10 or YYYY-20 format"
-                              aria-label="First semester period"
-                            />
-                          </label>`
-                        : `<span class="semester-term">${escapeHtml(semester.termHint)}</span>`
-                    }
+                    <label class="semester-term-editor">
+                      ${semesterIndex === 0 ? "<span>Edit first period</span>" : ""}
+                      <input
+                        data-semester-term="${escapeHtml(semester.id)}"
+                        value="${escapeHtml(semester.termHint)}"
+                        size="${semester.termHint.length}"
+                        pattern="\\d{4}-(10|20)"
+                        title="Use a regular term in YYYY-10 or YYYY-20 format"
+                        aria-label="${escapeHtml(semester.label)} period"
+                      />
+                    </label>
                     <h2>${escapeHtml(semester.label)}</h2>
                     <strong>${credits} / ${plan.creditLimitPerSemester} credits${isOverloaded ? " !" : ""}</strong>
                     <div
@@ -365,6 +367,15 @@ export function renderApp(
     actions.updatePlan((current) => ({ ...current, name: name || "Untitled plan" }));
   });
 
+  const planNameInput =
+    root.querySelector<HTMLInputElement>("#plan-name");
+
+  root.querySelectorAll<HTMLInputElement>(".roadmap-title input, .semester-term-editor input").forEach((input) => {
+    input.addEventListener("input", () => {
+      input.size = Math.max(input === planNameInput ? 8 : 1, input.value.length);
+    });
+  });
+
   root.querySelector<HTMLInputElement>("#semester-count")?.addEventListener("change", (event) => {
     const count = Number((event.currentTarget as HTMLInputElement).value);
     actions.updatePlan((current) => resizeSemesters(current, count));
@@ -394,10 +405,16 @@ export function renderApp(
     update(term);
   }
 
-  root.querySelector<HTMLInputElement>("#first-semester-term")?.addEventListener("change", (event) => {
-    const input = event.currentTarget as HTMLInputElement;
-    updateTermInput(input, (term) => {
-      actions.updatePlan((current) => cascadeSemesterTerms(current, 0, term));
+  root.querySelectorAll<HTMLInputElement>("[data-semester-term]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const semesterId = input.dataset.semesterTerm;
+      if (!semesterId) return;
+
+      updateTermInput(input, (term) => {
+        actions.updatePlan((current) =>
+          updateSemesterTerm(current, semesterId, term),
+        );
+      });
     });
   });
 

@@ -391,10 +391,11 @@ button {
 
 .roadmap-title {
   display: grid;
+  justify-items: start;
 }
 
 .roadmap-title input {
-  width: min(430px, 40vw);
+  max-width: min(430px, 40vw);
   border: 0;
   border-bottom: 2px solid #aebbad;
   padding: 1px 0 4px;
@@ -477,17 +478,10 @@ button {
   background: rgba(246, 248, 244, 0.8);
 }
 
-.semester-term {
-  margin-bottom: 5px;
-  color: #748078;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-}
-
 .semester-term-editor {
   display: grid;
-  width: 108px;
+  justify-items: start;
+  width: max-content;
   margin-bottom: 5px;
 }
 
@@ -500,8 +494,7 @@ button {
 }
 
 .semester-term-editor input {
-  width: 100%;
-  box-sizing: border-box;
+  min-width: 0;
   border: 0;
   border-bottom: 1px solid #8d9b8f;
   padding: 3px 1px;
