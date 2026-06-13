@@ -481,8 +481,31 @@ button {
   font-size: 11px;
 }
 
+.credit-meter {
+  height: 4px;
+  overflow: hidden;
+  margin-top: 7px;
+  border-radius: 999px;
+  background: #dce3da;
+}
+
+.credit-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #5e8267;
+}
+
 .semester-row--warning .semester-meta strong {
   color: #a35c18;
+}
+
+.semester-row--warning .credit-meter {
+  background: rgba(164, 99, 24, 0.18);
+}
+
+.semester-row--warning .credit-meter span {
+  background: #ae6116;
 }
 
 .semester-row--warning .semester-meta {
@@ -571,22 +594,32 @@ button {
   font-weight: 900;
 }
 
-.course-card__remove {
+.course-card__actions {
   position: absolute;
   right: 5px;
   bottom: 5px;
+  display: flex;
+  gap: 3px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.course-card__action {
   border: 0;
   border-radius: 5px;
   padding: 3px 5px;
   color: white;
   background: rgba(0, 0, 0, 0.22);
   font-size: 8px;
-  opacity: 0;
-  transition: opacity 120ms ease;
 }
 
-.course-card:hover .course-card__remove,
-.course-card:focus-within .course-card__remove {
+.course-card__action:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.course-card:hover .course-card__actions,
+.course-card:focus-within .course-card__actions {
   opacity: 1;
 }
 

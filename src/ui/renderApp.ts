@@ -2,6 +2,8 @@ import type { Course, PlannedCourse } from "../models/course";
 import type { CourseSearchState } from "../models/courseSearch";
 import type { StudyPlan } from "../models/studyPlan";
 import { mockCourses } from "../presets/mockCourses";
+import { STORAGE_DESTINATION } from "../state/courseDestination";
+import { deleteCourse, moveCourse } from "../state/planCourses";
 import {
   resizeSemesters,
   toPlannedCourse,
@@ -29,11 +31,20 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#039;");
 }
 
-function courseCard(course: PlannedCourse, duplicatedCodes: Set<string>): string {
+function courseCard(
+  course: PlannedCourse,
+  duplicatedCodes: Set<string>,
+  location: "semester" | "storage",
+  canPlace = true,
+): string {
   const palette = getCoursePalette(course);
   const duplicateBadge = duplicatedCodes.has(course.code)
     ? '<span class="course-card__warning" title="Duplicate course">!</span>'
     : "";
+  const moveAction =
+    location === "storage"
+      ? `<button class="course-card__action" data-place-course="${escapeHtml(course.id)}" title="${canPlace ? "Place in the selected semester" : "Select a semester before placing"}" ${canPlace ? "" : "disabled"}>Place</button>`
+      : `<button class="course-card__action" data-store-course="${escapeHtml(course.id)}" title="Move to storage">Store</button>`;
 
   return `
     <article
@@ -45,7 +56,10 @@ function courseCard(course: PlannedCourse, duplicatedCodes: Set<string>): string
       <strong>${escapeHtml(course.code)}</strong>
       <span>${escapeHtml(course.name)}</span>
       <small>${course.credits} cr</small>
-      <button class="course-card__remove" data-remove-course="${escapeHtml(course.id)}" title="Remove course">Remove</button>
+      <div class="course-card__actions">
+        ${moveAction}
+        <button class="course-card__action" data-remove-course="${escapeHtml(course.id)}" title="Remove course">Remove</button>
+      </div>
     </article>
   `;
 }
@@ -96,17 +110,6 @@ function searchContent(search: CourseSearchState): string {
   }
 
   return '<p class="search-status">Search by code or course name to add a course.</p>';
-}
-
-function findAndRemoveCourse(plan: StudyPlan, courseId: string): StudyPlan {
-  return {
-    ...plan,
-    semesters: plan.semesters.map((semester) => ({
-      ...semester,
-      courses: semester.courses.filter((course) => course.id !== courseId),
-    })),
-    storage: plan.storage.filter((course) => course.id !== courseId),
-  };
 }
 
 export function renderApp(
@@ -174,7 +177,14 @@ export function renderApp(
             ${
               plan.storage.length > 0
                 ? plan.storage
-                    .map((course) => courseCard(course, duplicatedCodes))
+                    .map((course) =>
+                      courseCard(
+                        course,
+                        duplicatedCodes,
+                        "storage",
+                        courseDestination !== STORAGE_DESTINATION,
+                      ),
+                    )
                     .join("")
                 : '<p class="empty-state">Courses removed from shortened plans land here.</p>'
             }
@@ -251,6 +261,10 @@ export function renderApp(
                 duplicatedCodes.has(course.code),
               );
               const hasWarning = isOverloaded || hasDuplicate;
+              const capacityPercent = Math.min(
+                100,
+                (credits / plan.creditLimitPerSemester) * 100,
+              );
 
               return `
                 <article class="semester-row ${hasWarning ? "semester-row--warning" : ""}">
@@ -258,12 +272,24 @@ export function renderApp(
                     <span>${escapeHtml(semester.termHint)}</span>
                     <h2>${escapeHtml(semester.label)}</h2>
                     <strong>${credits} / ${plan.creditLimitPerSemester} credits${isOverloaded ? " !" : ""}</strong>
+                    <div
+                      class="credit-meter"
+                      role="meter"
+                      aria-label="${escapeHtml(semester.label)} credit load"
+                      aria-valuemin="0"
+                      aria-valuemax="${plan.creditLimitPerSemester}"
+                      aria-valuenow="${credits}"
+                    >
+                      <span style="width: ${capacityPercent}%"></span>
+                    </div>
                   </header>
                   <div class="semester-track">
                     ${
                       semester.courses.length > 0
                         ? semester.courses
-                            .map((course) => courseCard(course, duplicatedCodes))
+                            .map((course) =>
+                              courseCard(course, duplicatedCodes, "semester"),
+                            )
                             .join("")
                         : '<p class="semester-empty">Add a course from the catalog</p>'
                     }
@@ -351,7 +377,27 @@ export function renderApp(
     button.addEventListener("click", () => {
       const courseId = button.dataset.removeCourse;
       if (!courseId) return;
-      actions.updatePlan((current) => findAndRemoveCourse(current, courseId));
+      actions.updatePlan((current) => deleteCourse(current, courseId));
+    });
+  });
+
+  root.querySelectorAll<HTMLButtonElement>("[data-store-course]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const courseId = button.dataset.storeCourse;
+      if (!courseId) return;
+      actions.updatePlan((current) =>
+        moveCourse(current, courseId, STORAGE_DESTINATION),
+      );
+    });
+  });
+
+  root.querySelectorAll<HTMLButtonElement>("[data-place-course]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const courseId = button.dataset.placeCourse;
+      if (!courseId || courseDestination === STORAGE_DESTINATION) return;
+      actions.updatePlan((current) =>
+        moveCourse(current, courseId, courseDestination),
+      );
     });
   });
 

@@ -45,6 +45,9 @@ working directory.
 - Pure model and validation unit tests
 - Uniandes course API adapter with normalized, deduplicated results
 - Search by course code or name with development fallback courses
+- Twenty-one-column semester tracks with credit-proportional cards
+- Manual movement between semester rows and unplaced-course storage
+- Semester credit-load meters and preserved add-course destination
 
 The course API is public but unofficially documented. If it is unavailable,
 PlanGrid displays a small set of development fallback courses instead of
