@@ -9,7 +9,7 @@ function includesFolded(text: string, query: string): boolean {
 export function getCatalogSnippet(
   course: CatalogCourse,
   query: string,
-  maxLength = 150,
+  maxLength = 260,
 ): string | undefined {
   const normalizedQuery = normalizeSearchText(query);
   const queryTokens = normalizedQuery.split(/\s+/).filter(Boolean);
@@ -20,6 +20,9 @@ export function getCatalogSnippet(
     .map((block) => block.trim())
     .filter(Boolean);
   const matched =
+    blocks.find((block) =>
+      queryTokens.every((token) => includesFolded(block, token)),
+    ) ??
     blocks.find((block) =>
       includesFolded(block, normalizedQuery) ||
       queryTokens.some((token) => includesFolded(block, token)),

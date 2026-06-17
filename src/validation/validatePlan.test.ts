@@ -117,7 +117,7 @@ describe("validatePlan", () => {
     );
   });
 
-  it("groups catalog-only and unknown availability warnings", () => {
+  it("does not warn for catalog-only courses but groups unknown availability", () => {
     const plan = createBlankPlan(1);
     plan.semesters[0].courses.push({
       id: "catalog",
@@ -138,8 +138,12 @@ describe("validatePlan", () => {
 
     expect(validatePlan(plan)).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: "catalog-only-courses" }),
         expect.objectContaining({ id: "unknown-availability-courses" }),
+      ]),
+    );
+    expect(validatePlan(plan)).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "catalog-only-courses" }),
       ]),
     );
   });

@@ -232,6 +232,7 @@ button {
 }
 
 .panel__heading {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -458,7 +459,15 @@ button {
   font-size: 10px;
   line-height: 1.35;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 4;
+}
+
+.catalog-course__snippet strong {
+  display: inline;
+  margin-right: 4px;
+  color: #66736a;
+  font-size: 9px;
+  text-transform: uppercase;
 }
 
 .catalog-course small {
@@ -485,13 +494,14 @@ button {
 
 .search-filters {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 7px;
   margin-bottom: 8px;
 }
 
 .search-filters label,
-.catalog-appearance-toggle {
+.catalog-appearance-toggle,
+.search-options-menu__panel label {
   display: grid;
   gap: 5px;
   color: #58655d;
@@ -499,7 +509,8 @@ button {
   font-weight: 800;
 }
 
-.search-filters select {
+.search-filters select,
+.search-options-menu__panel select {
   min-width: 0;
   border: 1px solid #ccd5ca;
   border-radius: 8px;
@@ -511,7 +522,53 @@ button {
 .catalog-appearance-toggle {
   grid-template-columns: auto 1fr;
   align-items: center;
-  margin-bottom: 8px;
+}
+
+.search-options-menu {
+  position: relative;
+}
+
+.search-options-menu summary {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid #d2dcd0;
+  border-radius: 50%;
+  color: #58655d;
+  background: #f8faf7;
+  font-weight: 900;
+  line-height: 1;
+  list-style: none;
+  cursor: pointer;
+}
+
+.search-options-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.search-options-menu[open] summary,
+.search-options-menu summary:hover,
+.search-options-menu summary:focus-visible {
+  border-color: #7ba082;
+  outline: none;
+  color: #25482f;
+  background: #edf6ea;
+}
+
+.search-options-menu__panel {
+  position: absolute;
+  z-index: 5;
+  top: 34px;
+  right: 0;
+  display: grid;
+  width: 230px;
+  gap: 12px;
+  border: 1px solid #d8ded5;
+  border-radius: 10px;
+  padding: 12px;
+  background: #ffffff;
+  box-shadow: 0 12px 34px rgba(35, 53, 42, 0.16);
 }
 
 .catalog-search-prompt {

@@ -119,7 +119,7 @@ function catalogCourseItem(course: CourseSearchResult): string {
       <div>
         <strong>${escapeHtml(course.code)}</strong>
         <span>${escapeHtml(course.name)}</span>
-        ${snippet ? `<p class="catalog-course__snippet">... ${escapeHtml(snippet)} ...</p>` : ""}
+        ${snippet ? `<p class="catalog-course__snippet"><strong>Why</strong> ${escapeHtml(snippet)}</p>` : ""}
       </div>
       <small>${course.credits} cr</small>
       <button type="button" data-result-details="${escapeHtml(course.code)}" title="Course details">${escapeHtml(availabilityText(course))}</button>
@@ -184,19 +184,22 @@ function searchContent(search: CourseSearchState): string {
 }
 
 function departmentFilterOptions(search: CourseSearchState): string {
-  const departments = [
-    ...new Set(
-      search.results
-        .map((result) => result.department)
-        .filter((department): department is string => Boolean(department)),
-    ),
-  ].sort();
+  const departments: Array<{ code: string; name?: string }> =
+    search.departmentOptions.length > 0
+      ? search.departmentOptions
+      : [
+          ...new Set(
+            search.results
+              .map((result) => result.department)
+              .filter((department): department is string => Boolean(department)),
+          ),
+        ].sort().map((code) => ({ code }));
 
   return [
     `<option value="all" ${search.filters.department === "all" ? "selected" : ""}>All departments</option>`,
     ...departments.map(
       (department) =>
-        `<option value="${escapeHtml(department)}" ${search.filters.department === department ? "selected" : ""}>${escapeHtml(department)}</option>`,
+        `<option value="${escapeHtml(department.code)}" ${search.filters.department === department.code ? "selected" : ""}>${escapeHtml(department.name ? `${department.code} - ${department.name}` : department.code)}</option>`,
     ),
   ].join("");
 }
@@ -404,6 +407,24 @@ export function renderApp(
               <span class="eyebrow">Uniandes catalog</span>
               <h2>Add courses</h2>
             </div>
+            <details class="search-options-menu">
+              <summary aria-label="Catalog search options" title="Catalog search options">...</summary>
+              <div class="search-options-menu__panel">
+                <label>
+                  <span>Source</span>
+                  <select id="source-filter">
+                    <option value="all" ${search.filters.source === "all" ? "selected" : ""}>All sources</option>
+                    <option value="api-available" ${search.filters.source === "api-available" ? "selected" : ""}>Current API</option>
+                    <option value="catalog-only" ${search.filters.source === "catalog-only" ? "selected" : ""}>Catalog only</option>
+                    <option value="unknown" ${search.filters.source === "unknown" ? "selected" : ""}>Unverified</option>
+                  </select>
+                </label>
+                <label class="catalog-appearance-toggle">
+                  <input id="muted-catalog-only" type="checkbox" ${searchAppearance.useMutedCatalogOnlyCards ? "checked" : ""} />
+                  <span>Muted catalog-only cards</span>
+                </label>
+              </div>
+            </details>
           </div>
           <form class="course-search" id="course-search-form">
             <label for="course-query">Course code, name, or requirement</label>
@@ -429,20 +450,7 @@ export function renderApp(
                 ${departmentFilterOptions(search)}
               </select>
             </label>
-            <label>
-              <span>Source</span>
-              <select id="source-filter">
-                <option value="all" ${search.filters.source === "all" ? "selected" : ""}>All sources</option>
-                <option value="api-available" ${search.filters.source === "api-available" ? "selected" : ""}>Current API</option>
-                <option value="catalog-only" ${search.filters.source === "catalog-only" ? "selected" : ""}>Catalog only</option>
-                <option value="unknown" ${search.filters.source === "unknown" ? "selected" : ""}>Unverified</option>
-              </select>
-            </label>
           </div>
-          <label class="catalog-appearance-toggle">
-            <input id="muted-catalog-only" type="checkbox" ${searchAppearance.useMutedCatalogOnlyCards ? "checked" : ""} />
-            <span>Muted catalog-only cards</span>
-          </label>
           <p class="drag-hint">Drag any result directly into a semester or storage.</p>
           <div class="search-results" aria-live="polite">
             ${searchContent(search)}

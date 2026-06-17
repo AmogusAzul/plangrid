@@ -24,6 +24,8 @@ import {
   loadSearchAppearanceSettings,
   saveSearchAppearanceSettings,
 } from "./state/searchAppearance";
+import { loadCatalogDepartments } from "./catalog/catalogMetadata";
+import { enrichPlanWithCatalogDescriptions } from "./state/planCatalogDescriptions";
 
 const root = document.querySelector<HTMLElement>("#app");
 
@@ -37,12 +39,43 @@ let courseSearch: CourseSearchState = initialCourseSearchState;
 let searchAppearance = loadSearchAppearanceSettings();
 let selectedDetailsCourse: Course | null = null;
 let activeSearch = 0;
+let activePlanEnrichment = 0;
+
+function updatePlanWithCatalogDescriptions(): void {
+  const enrichmentId = activePlanEnrichment + 1;
+  activePlanEnrichment = enrichmentId;
+  const sourcePlan = plan;
+
+  void enrichPlanWithCatalogDescriptions(sourcePlan).then((enrichedPlan) => {
+    if (enrichmentId !== activePlanEnrichment || enrichedPlan === sourcePlan) {
+      return;
+    }
+
+    plan = savePlan(enrichedPlan);
+    render();
+  }).catch(() => {
+    // Catalog details are helpful, but planning should keep working without them.
+  });
+}
+
+function loadCachedCatalogDepartments(): void {
+  void loadCatalogDepartments().then((departmentOptions) => {
+    courseSearch = {
+      ...courseSearch,
+      departmentOptions,
+    };
+    render();
+  }).catch(() => {
+    // The filter remains usable with result-derived departments if the index fails.
+  });
+}
 
 function render(): void {
   renderApp(appRoot, plan, courseSearch, searchAppearance, selectedDetailsCourse, {
     updatePlan(update) {
       plan = savePlan(update(plan));
       render();
+      updatePlanWithCatalogDescriptions();
     },
     resetPlan() {
       localStorage.removeItem(STORAGE_KEY);
@@ -60,6 +93,7 @@ function render(): void {
       const imported = await importPlanFile(await file.text());
       plan = savePlan(imported.plan);
       render();
+      updatePlanWithCatalogDescriptions();
       return imported.fallbackCodes;
     },
     async loadPreset(presetId: string) {
@@ -71,6 +105,7 @@ function render(): void {
       const loaded = await loadPlanPreset(preset);
       plan = savePlan(loaded.plan);
       render();
+      updatePlanWithCatalogDescriptions();
       return loaded.fallbackCodes;
     },
     updateSearchFilters(filters) {
@@ -144,4 +179,6 @@ function render(): void {
   });
 }
 
+loadCachedCatalogDepartments();
+updatePlanWithCatalogDescriptions();
 render();

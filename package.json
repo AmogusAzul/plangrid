@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "build:catalog": "tsx scripts/buildCatalogIndex.ts",
+    "plan:preset": "tsx scripts/planToPreset.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"

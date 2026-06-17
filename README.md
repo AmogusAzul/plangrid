@@ -80,6 +80,12 @@ Rebuild the static catalog index with:
 npm run build:catalog
 ```
 
+Turn an exported `.plan` file into a preset JSON draft with:
+
+```bash
+npm run plan:preset -- my-plan.plan src/presets/my-plan.json
+```
+
 The 2026 SmartCatalog page itself describes courses active during 2025; PlanGrid
 keeps the source version as `catalogYear: "2026"` because that is the catalog
 route and handoff target.
