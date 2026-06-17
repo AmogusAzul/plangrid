@@ -19,7 +19,13 @@ describe("hydrateCourses", () => {
       async () => fresh,
     );
 
-    expect(hydrated.courses.get(cached.code)).toEqual(fresh);
+    expect(hydrated.courses.get(cached.code)).toEqual(
+      expect.objectContaining({
+        ...fresh,
+        metadataSource: "api",
+        availability: "api-available",
+      }),
+    );
     expect(hydrated.cachedCodes).toEqual([]);
     expect(hydrated.fallbackCodes).toEqual([]);
   });

@@ -63,5 +63,33 @@ export function validatePlan(plan: StudyPlan): PlanWarning[] {
     }
   }
 
+  const catalogOnlyCourses = [...coursesByCode.values()]
+    .flat()
+    .filter((course) => course.availability === "catalog-only");
+  if (catalogOnlyCourses.length > 0) {
+    warnings.push({
+      id: "catalog-only-courses",
+      severity: "warning",
+      message: `${catalogOnlyCourses.length} course${catalogOnlyCourses.length === 1 ? " was" : "s were"} added from catalog data only and not found in the current offering API.`,
+      relatedCourseCodes: [
+        ...new Set(catalogOnlyCourses.map((course) => course.code)),
+      ],
+    });
+  }
+
+  const unknownAvailabilityCourses = [...coursesByCode.values()]
+    .flat()
+    .filter((course) => course.availability === "unknown");
+  if (unknownAvailabilityCourses.length > 0) {
+    warnings.push({
+      id: "unknown-availability-courses",
+      severity: "warning",
+      message: `Could not verify availability for ${unknownAvailabilityCourses.length} catalog course${unknownAvailabilityCourses.length === 1 ? "" : "s"}. Catalog metadata was used.`,
+      relatedCourseCodes: [
+        ...new Set(unknownAvailabilityCourses.map((course) => course.code)),
+      ],
+    });
+  }
+
   return warnings;
 }

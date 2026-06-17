@@ -1,5 +1,7 @@
 import type { Course, PlannedCourse } from "../models/course";
 import type { CourseSearchState } from "../models/courseSearch";
+import type { SearchAppearanceSettings } from "../models/searchAppearance";
+import type { CourseSearchResult, SearchFilters } from "../models/searchResult";
 import type { StudyPlan } from "../models/studyPlan";
 import { mockCourses } from "../presets/mockCourses";
 import { planPresets } from "../presets/planPresets";
@@ -39,8 +41,11 @@ type AppActions = {
   exportPlan: () => void;
   importPlan: (file: File) => Promise<string[]>;
   loadPreset: (presetId: string) => Promise<string[]>;
-  setCourseDestination: (destination: string) => void;
-  search: (query: string) => Promise<void>;
+  updateSearchFilters: (filters: SearchFilters) => void;
+  updateSearchAppearance: (settings: SearchAppearanceSettings) => void;
+  showCourseDetails: (course: Course) => void;
+  closeCourseDetails: () => void;
+  search: (query: string, mode?: "fast" | "catalog") => Promise<void>;
 };
 
 const mainClass: string = "planner";
@@ -58,7 +63,7 @@ function courseCard(
   course: PlannedCourse,
   affectedCourseCodes: Set<string>,
   location: "semester" | "storage",
-  canPlace = true,
+  useMutedCatalogOnlyCards: boolean,
   position?: PositionedCourse,
 ): string {
   const palette = getCoursePalette(course);
@@ -66,15 +71,19 @@ function courseCard(
     ? '<span class="course-card__warning" role="img" aria-label="Course warning" title="Course warning">!</span>'
     : "";
   const moveAction =
-    location === "storage"
-      ? `<button class="course-card__action" data-place-course="${escapeHtml(course.id)}" title="${canPlace ? "Place in the selected semester" : "Select a semester before placing"}" ${canPlace ? "" : "disabled"}>Place</button>`
-      : `<button class="course-card__action" data-store-course="${escapeHtml(course.id)}" title="Move to storage">Store</button>`;
+    location === "semester"
+      ? `<button class="course-card__action" data-store-course="${escapeHtml(course.id)}" title="Move to storage">Store</button>`
+      : "";
+  const isCatalogOnly = course.availability === "catalog-only";
+  const source = course.availability ?? "api-available";
 
   return `
     <article
       class="course-card"
       style="--course-span: ${position?.span ?? Math.max(1, course.credits)}; --course-column: ${position?.column ?? 1}; --course-color: ${palette.background}"
       data-course-id="${escapeHtml(course.id)}"
+      data-source="${escapeHtml(source)}"
+      data-muted-catalog-only="${isCatalogOnly && useMutedCatalogOnlyCards ? "true" : "false"}"
       draggable="true"
       title="Drag to another semester or storage"
     >
@@ -84,13 +93,21 @@ function courseCard(
       <small>${course.credits} cr</small>
       <div class="course-card__actions">
         ${moveAction}
+        <button class="course-card__action" data-course-details="${escapeHtml(course.id)}" title="Course details">Details</button>
         <button class="course-card__action" data-remove-course="${escapeHtml(course.id)}" title="Remove course">Remove</button>
       </div>
     </article>
   `;
 }
 
-function catalogCourseItem(course: Course): string {
+function availabilityText(course: Course): string {
+  if (course.availability === "catalog-only") return "Catalog";
+  if (course.availability === "unknown") return "Unverified";
+  return "Current";
+}
+
+function catalogCourseItem(course: CourseSearchResult): string {
+  const snippet = course.matchedSnippet || course.catalog?.matchedSnippet;
   return `
     <li
       class="catalog-course"
@@ -102,9 +119,10 @@ function catalogCourseItem(course: Course): string {
       <div>
         <strong>${escapeHtml(course.code)}</strong>
         <span>${escapeHtml(course.name)}</span>
+        ${snippet ? `<p class="catalog-course__snippet">... ${escapeHtml(snippet)} ...</p>` : ""}
       </div>
       <small>${course.credits} cr</small>
-      <button data-add-course="${escapeHtml(course.code)}">Add</button>
+      <button type="button" data-result-details="${escapeHtml(course.code)}" title="Course details">${escapeHtml(availabilityText(course))}</button>
     </li>
   `;
 }
@@ -112,6 +130,9 @@ function catalogCourseItem(course: Course): string {
 function searchContent(search: CourseSearchState): string {
   if (search.status === "loading") {
     return '<p class="search-status">Searching the Uniandes course catalog...</p>';
+  }
+  if (search.status === "catalog-loading") {
+    return '<p class="search-status">Searching catalog descriptions across departments...</p>';
   }
 
   if (search.status === "error") {
@@ -122,18 +143,37 @@ function searchContent(search: CourseSearchState): string {
       </div>
       <p class="catalog-label">Development fallback courses</p>
       <ul class="catalog-list">
-        ${mockCourses.map(catalogCourseItem).join("")}
+        ${mockCourses.map((course) =>
+          catalogCourseItem({
+            ...course,
+            source: "api",
+            metadataSource: "api",
+            availability: "api-available",
+          }),
+        ).join("")}
       </ul>
     `;
   }
 
   if (search.status === "success") {
     if (search.results.length === 0) {
-      return `<p class="search-status">No courses found for "${escapeHtml(search.query)}".</p>`;
+      return `
+        <p class="search-status">No courses found for "${escapeHtml(search.query)}".</p>
+        ${
+          search.mode === "fast"
+            ? '<button class="catalog-search-prompt" type="button" id="catalog-search">Try thorough catalog search</button>'
+            : ""
+        }
+      `;
     }
 
     return `
-      <p class="catalog-label">${search.results.length} unique courses found</p>
+      <p class="catalog-label">${search.mode === "catalog" ? "Catalog results" : `${search.results.length} unique courses found`}</p>
+      ${
+        search.mode === "fast" && search.results.length < 3
+          ? '<button class="catalog-search-prompt" type="button" id="catalog-search">Search catalog descriptions too</button>'
+          : ""
+      }
       <ul class="catalog-list">
         ${search.results.map(catalogCourseItem).join("")}
       </ul>
@@ -143,11 +183,37 @@ function searchContent(search: CourseSearchState): string {
   return '<p class="search-status">Search by code, name, or requirement such as CBU, CLE, EC, EING, or EP.</p>';
 }
 
+function departmentFilterOptions(search: CourseSearchState): string {
+  const departments = [
+    ...new Set(
+      search.results
+        .map((result) => result.department)
+        .filter((department): department is string => Boolean(department)),
+    ),
+  ].sort();
+
+  return [
+    `<option value="all" ${search.filters.department === "all" ? "selected" : ""}>All departments</option>`,
+    ...departments.map(
+      (department) =>
+        `<option value="${escapeHtml(department)}" ${search.filters.department === department ? "selected" : ""}>${escapeHtml(department)}</option>`,
+    ),
+  ].join("");
+}
+
+function allPlannedCourses(plan: StudyPlan): PlannedCourse[] {
+  return [
+    ...plan.semesters.flatMap((semester) => semester.courses),
+    ...plan.storage,
+  ];
+}
+
 export function renderApp(
   root: HTMLElement,
   plan: StudyPlan,
   search: CourseSearchState,
-  courseDestination: string,
+  searchAppearance: SearchAppearanceSettings,
+  selectedDetailsCourse: Course | null,
   actions: AppActions,
 ): void {
   const scrollPosition = captureAppScroll(root);
@@ -246,6 +312,40 @@ export function renderApp(
           <p>Tu trabajo se guarda automáticamente únicamente en este navegador.</p>
         </section>
       </dialog>
+      ${
+        selectedDetailsCourse
+          ? `<aside class="course-details" role="dialog" aria-label="Course details">
+              <div class="course-details__panel">
+                <button class="help-dialog__close" id="close-course-details" type="button" aria-label="Close details">Close</button>
+                <span class="eyebrow">${escapeHtml(selectedDetailsCourse.department ?? selectedDetailsCourse.code.split("-", 1)[0] ?? "Course")}</span>
+                <h2>${escapeHtml(selectedDetailsCourse.code)} — ${escapeHtml(selectedDetailsCourse.name)}</h2>
+                <p class="course-details__meta">
+                  ${selectedDetailsCourse.credits} credits · ${escapeHtml(selectedDetailsCourse.metadataSource ?? "api")} · ${escapeHtml(availabilityText(selectedDetailsCourse))}
+                </p>
+                ${
+                  selectedDetailsCourse.catalog?.description
+                    ? `<section><h3>Description</h3><p>${escapeHtml(selectedDetailsCourse.catalog.description)}</p></section>`
+                    : '<section><h3>Description</h3><p>No catalog description is saved for this course.</p></section>'
+                }
+                <section>
+                  <h3>Availability</h3>
+                  <p>${
+                    selectedDetailsCourse.availability === "catalog-only"
+                      ? "Found in the 2026 catalog, but not found in the current 202620 offering API."
+                      : selectedDetailsCourse.availability === "unknown"
+                        ? "Could not verify this course against the current 202620 offering API."
+                        : "Found in the current 202620 offering API."
+                  }</p>
+                </section>
+                ${
+                  selectedDetailsCourse.catalog?.catalogUrl
+                    ? `<a class="course-details__link" href="${escapeHtml(selectedDetailsCourse.catalog.catalogUrl)}" target="_blank" rel="noreferrer">Open catalog source</a>`
+                    : ""
+                }
+              </div>
+            </aside>`
+          : ""
+      }
 
       <aside class="sidebar">
         <section class="panel warnings-panel" aria-live="polite">
@@ -289,7 +389,7 @@ export function renderApp(
                         course,
                         affectedCourseCodes,
                         "storage",
-                        courseDestination !== STORAGE_DESTINATION,
+                        searchAppearance.useMutedCatalogOnlyCards,
                       ),
                     )
                     .join("")
@@ -322,17 +422,26 @@ export function renderApp(
               </button>
             </div>
           </form>
-          <label class="field">
-            <span>Add courses to</span>
-            <select id="course-destination">
-              ${plan.semesters
-                .map(
-                  (semester) =>
-                    `<option value="${escapeHtml(semester.id)}" ${semester.id === courseDestination ? "selected" : ""}>${escapeHtml(semester.label)}</option>`,
-                )
-                .join("")}
-              <option value="storage" ${courseDestination === "storage" ? "selected" : ""}>Storage</option>
-            </select>
+          <div class="search-filters">
+            <label>
+              <span>Department</span>
+              <select id="department-filter">
+                ${departmentFilterOptions(search)}
+              </select>
+            </label>
+            <label>
+              <span>Source</span>
+              <select id="source-filter">
+                <option value="all" ${search.filters.source === "all" ? "selected" : ""}>All sources</option>
+                <option value="api-available" ${search.filters.source === "api-available" ? "selected" : ""}>Current API</option>
+                <option value="catalog-only" ${search.filters.source === "catalog-only" ? "selected" : ""}>Catalog only</option>
+                <option value="unknown" ${search.filters.source === "unknown" ? "selected" : ""}>Unverified</option>
+              </select>
+            </label>
+          </div>
+          <label class="catalog-appearance-toggle">
+            <input id="muted-catalog-only" type="checkbox" ${searchAppearance.useMutedCatalogOnlyCards ? "checked" : ""} />
+            <span>Muted catalog-only cards</span>
           </label>
           <p class="drag-hint">Drag any result directly into a semester or storage.</p>
           <div class="search-results" aria-live="polite">
@@ -454,7 +563,7 @@ export function renderApp(
                                 position.course,
                                 affectedCourseCodes,
                                 "semester",
-                                true,
+                                searchAppearance.useMutedCatalogOnlyCards,
                                 position,
                               ),
                             ).join("")
@@ -539,29 +648,67 @@ export function renderApp(
     void actions.search(query);
   });
 
-  root.querySelector<HTMLSelectElement>("#course-destination")?.addEventListener("change", (event) => {
-    actions.setCourseDestination(
-      (event.currentTarget as HTMLSelectElement).value,
-    );
+  root.querySelector<HTMLButtonElement>("#catalog-search")?.addEventListener("click", () => {
+    void actions.search(search.query, "catalog");
+  });
+
+  function updateFilters(): void {
+    const department =
+      root.querySelector<HTMLSelectElement>("#department-filter")?.value ??
+      search.filters.department;
+    const source =
+      root.querySelector<HTMLSelectElement>("#source-filter")?.value ??
+      search.filters.source;
+    actions.updateSearchFilters({
+      department,
+      source: source as SearchFilters["source"],
+    });
+    if (search.query) {
+      void actions.search(search.query, search.mode);
+    }
+  }
+
+  root.querySelector<HTMLSelectElement>("#department-filter")?.addEventListener("change", updateFilters);
+  root.querySelector<HTMLSelectElement>("#source-filter")?.addEventListener("change", updateFilters);
+  root.querySelector<HTMLInputElement>("#muted-catalog-only")?.addEventListener("change", (event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    actions.updateSearchAppearance({
+      useMutedCatalogOnlyCards: input.checked,
+    });
   });
 
   const availableCourses = new Map(
     [
       ...search.results,
-      ...(search.status === "error" ? mockCourses : []),
+      ...(search.status === "error"
+        ? mockCourses.map((course) => ({
+            ...course,
+            source: "api" as const,
+            metadataSource: "api" as const,
+            availability: "api-available" as const,
+          }))
+        : []),
     ].map((course) => [course.code, course]),
   );
 
-  root.querySelectorAll<HTMLButtonElement>("[data-add-course]").forEach((button) => {
+  root.querySelectorAll<HTMLButtonElement>("[data-result-details]").forEach((button) => {
     button.addEventListener("click", () => {
-      const course = availableCourses.get(button.dataset.addCourse ?? "");
-      const destination =
-        root.querySelector<HTMLSelectElement>("#course-destination")?.value;
-
-      if (!course || !destination) return;
-
-      actions.updatePlan((current) => addCourse(current, course, destination));
+      const course = availableCourses.get(button.dataset.resultDetails ?? "");
+      if (course) actions.showCourseDetails(course);
     });
+  });
+
+  root.querySelectorAll<HTMLButtonElement>("[data-course-details]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const course = allPlannedCourses(plan).find(
+        (entry) => entry.id === button.dataset.courseDetails,
+      );
+      if (course) actions.showCourseDetails(course);
+    });
+  });
+
+  root.querySelector<HTMLButtonElement>("#close-course-details")?.addEventListener("click", () => {
+    actions.closeCourseDetails();
   });
 
   root.querySelectorAll<HTMLButtonElement>("[data-remove-course]").forEach((button) => {
@@ -578,16 +725,6 @@ export function renderApp(
       if (!courseId) return;
       actions.updatePlan((current) =>
         moveCourse(current, courseId, STORAGE_DESTINATION),
-      );
-    });
-  });
-
-  root.querySelectorAll<HTMLButtonElement>("[data-place-course]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const courseId = button.dataset.placeCourse;
-      if (!courseId || courseDestination === STORAGE_DESTINATION) return;
-      actions.updatePlan((current) =>
-        moveCourse(current, courseId, courseDestination),
       );
     });
   });
@@ -615,10 +752,9 @@ export function renderApp(
       );
     }
 
-    const plannedCourse = [
-      ...plan.semesters.flatMap((semester) => semester.courses),
-      ...plan.storage,
-    ].find((course) => course.id === payload.courseId);
+    const plannedCourse = allPlannedCourses(plan).find(
+      (course) => course.id === payload.courseId,
+    );
 
     return Math.min(
       SEMESTER_GRID_COLUMNS,

@@ -1,13 +1,13 @@
 import "./styles.css";
-import { searchCourses } from "./api/courseApi";
+import {
+  searchFastCourses,
+  searchThoroughCatalogCourses,
+} from "./api/enhancedCourseSearch";
+import type { Course } from "./models/course";
 import {
   initialCourseSearchState,
   type CourseSearchState,
 } from "./models/courseSearch";
-import {
-  getDefaultCourseDestination,
-  normalizeCourseDestination,
-} from "./state/courseDestination";
 import { createBlankPlan } from "./state/planFactory";
 import { loadPlan, savePlan, STORAGE_KEY } from "./state/planStorage";
 import { renderApp } from "./ui/renderApp";
@@ -20,6 +20,10 @@ import {
   loadPlanPreset,
   planPresets,
 } from "./presets/planPresets";
+import {
+  loadSearchAppearanceSettings,
+  saveSearchAppearanceSettings,
+} from "./state/searchAppearance";
 
 const root = document.querySelector<HTMLElement>("#app");
 
@@ -30,13 +34,12 @@ if (!root) {
 const appRoot = root;
 let plan = loadPlan();
 let courseSearch: CourseSearchState = initialCourseSearchState;
-let courseDestination = getDefaultCourseDestination(plan);
+let searchAppearance = loadSearchAppearanceSettings();
+let selectedDetailsCourse: Course | null = null;
 let activeSearch = 0;
 
 function render(): void {
-  courseDestination = normalizeCourseDestination(plan, courseDestination);
-
-  renderApp(appRoot, plan, courseSearch, courseDestination, {
+  renderApp(appRoot, plan, courseSearch, searchAppearance, selectedDetailsCourse, {
     updatePlan(update) {
       plan = savePlan(update(plan));
       render();
@@ -44,7 +47,7 @@ function render(): void {
     resetPlan() {
       localStorage.removeItem(STORAGE_KEY);
       plan = savePlan(createBlankPlan());
-      courseDestination = getDefaultCourseDestination(plan);
+      selectedDetailsCourse = null;
       render();
     },
     exportPNG(planner: HTMLElement, planName: string) {
@@ -56,7 +59,6 @@ function render(): void {
     async importPlan(file: File) {
       const imported = await importPlanFile(await file.text());
       plan = savePlan(imported.plan);
-      courseDestination = getDefaultCourseDestination(plan);
       render();
       return imported.fallbackCodes;
     },
@@ -68,31 +70,55 @@ function render(): void {
 
       const loaded = await loadPlanPreset(preset);
       plan = savePlan(loaded.plan);
-      courseDestination = getDefaultCourseDestination(plan);
       render();
       return loaded.fallbackCodes;
     },
-    setCourseDestination(destination) {
-      courseDestination = normalizeCourseDestination(plan, destination);
+    updateSearchFilters(filters) {
+      courseSearch = {
+        ...courseSearch,
+        filters,
+      };
+      render();
     },
-    async search(query) {
+    updateSearchAppearance(settings) {
+      searchAppearance = saveSearchAppearanceSettings(settings);
+      render();
+    },
+    showCourseDetails(course) {
+      selectedDetailsCourse = course;
+      render();
+    },
+    closeCourseDetails() {
+      selectedDetailsCourse = null;
+      render();
+    },
+    async search(query, mode = "fast") {
       const normalizedQuery = query.trim();
       const searchId = activeSearch + 1;
       activeSearch = searchId;
       courseSearch = {
+        ...courseSearch,
         query: normalizedQuery,
-        status: "loading",
+        mode,
+        status: mode === "catalog" ? "catalog-loading" : "loading",
         results: [],
         error: null,
       };
       render();
 
       try {
-        const results = await searchCourses(normalizedQuery);
+        const results = mode === "catalog"
+          ? await searchThoroughCatalogCourses(
+              normalizedQuery,
+              courseSearch.filters,
+            )
+          : await searchFastCourses(normalizedQuery, courseSearch.filters);
         if (searchId !== activeSearch) return;
 
         courseSearch = {
+          ...courseSearch,
           query: normalizedQuery,
+          mode,
           status: "success",
           results,
           error: null,
@@ -101,7 +127,9 @@ function render(): void {
         if (searchId !== activeSearch) return;
 
         courseSearch = {
+          ...courseSearch,
           query: normalizedQuery,
+          mode,
           status: "error",
           results: [],
           error:

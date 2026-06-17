@@ -22,6 +22,8 @@ function fallbackCourse(code: string): Course {
     name: `Unknown course (${code})`,
     credits: 3,
     department: code.split("-", 1)[0] || undefined,
+    metadataSource: "fallback",
+    metadataFallback: true,
   };
 }
 
@@ -52,9 +54,17 @@ export async function hydrateCourses(
         freshCourse = null;
       }
 
+      const cachedCourse = cached.get(code);
       const course = freshCourse
-        ? normalizeCourse(freshCourse)
-        : cached.get(code);
+        ? {
+            ...normalizeCourse(freshCourse),
+            metadataSource: cachedCourse?.catalog
+              ? "api+catalog" as const
+              : "api" as const,
+            catalog: cachedCourse?.catalog,
+            availability: "api-available" as const,
+          }
+        : cachedCourse;
 
       if (course) {
         if (!freshCourse) {

@@ -54,6 +54,8 @@ describe("plan file export", () => {
 
     expect(text).toContain('plan_name,"Plan, ""Special"""');
     expect(text).toContain("[courses]");
+    expect(text).toContain("format_version,3");
+    expect(text).toContain("metadata_source,availability");
     expect(text).toContain("ISIS-1221,Programming,3");
     expect(text).toContain("slot_10");
     expect(parsed.name).toBe('Plan, "Special"');
@@ -80,7 +82,7 @@ describe("plan file export", () => {
     const text = serializePlanFile(plan);
 
     expect(() =>
-      parsePlanFile(text.replace("format_version,2", "format_version,99")),
+      parsePlanFile(text.replace("format_version,3", "format_version,99")),
     ).toThrow(PlanFileError);
     expect(() =>
       parsePlanFile(text.replace("[storage]", "[backlog]")),
@@ -195,6 +197,42 @@ describe("plan file import", () => {
         "metadataFallback",
       ),
     ).toBe(false);
+  });
+
+  it("exports and imports catalog metadata in format version 3", async () => {
+    const plan = createBlankPlan(1);
+    plan.semesters[0].courses.push({
+      id: "catalog-only",
+      code: "DERE-3001",
+      name: "Derecho Ambiental",
+      credits: 3,
+      department: "DERE",
+      metadataSource: "catalog",
+      availability: "catalog-only",
+      catalog: {
+        title: "Derecho Ambiental",
+        description: "Estudia regulación ambiental.",
+        departmentCode: "DERE",
+        departmentName: "Derecho",
+        catalogYear: "2026",
+        catalogUrl: "https://example.test/dere-3001",
+      },
+    });
+
+    const text = serializePlanFile(plan);
+    const imported = await importPlanFile(text, async () => null);
+
+    expect(text).toContain("catalog_description");
+    expect(imported.plan.semesters[0].courses[0]).toEqual(
+      expect.objectContaining({
+        availability: "catalog-only",
+        metadataSource: "catalog",
+        catalog: expect.objectContaining({
+          description: "Estudia regulación ambiental.",
+          catalogUrl: "https://example.test/dere-3001",
+        }),
+      }),
+    );
   });
 
   it("uses persistent three-credit fallback metadata when lookup fails", async () => {

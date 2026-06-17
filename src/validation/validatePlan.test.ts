@@ -116,4 +116,31 @@ describe("validatePlan", () => {
       ]),
     );
   });
+
+  it("groups catalog-only and unknown availability warnings", () => {
+    const plan = createBlankPlan(1);
+    plan.semesters[0].courses.push({
+      id: "catalog",
+      code: "DERE-3001",
+      name: "Derecho Ambiental",
+      credits: 3,
+      availability: "catalog-only",
+      metadataSource: "catalog",
+    });
+    plan.storage.push({
+      id: "unknown",
+      code: "BIOL-1001",
+      name: "Biologia",
+      credits: 3,
+      availability: "unknown",
+      metadataSource: "catalog",
+    });
+
+    expect(validatePlan(plan)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "catalog-only-courses" }),
+        expect.objectContaining({ id: "unknown-availability-courses" }),
+      ]),
+    );
+  });
 });

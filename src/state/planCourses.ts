@@ -1,7 +1,7 @@
 import type { Course, PlannedCourse } from "../models/course";
 import type { StudyPlan } from "../models/studyPlan";
 import { STORAGE_DESTINATION } from "./courseDestination";
-import { toPlannedCourse } from "./planFactory";
+import { createPlannedCourseFromCourse } from "./createPlannedCourse";
 import { insertCourseAtSlot } from "./semesterLayout";
 
 type RemovedCourse = {
@@ -52,7 +52,7 @@ export function addCourse(
 
   if (!destinationExists) return plan;
 
-  const plannedCourse = toPlannedCourse(course);
+  const plannedCourse = createPlannedCourseFromCourse(course);
 
   if (destination === STORAGE_DESTINATION) {
     return {

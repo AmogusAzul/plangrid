@@ -12,7 +12,8 @@ import {
 } from "../state/semesterLayout";
 import { downloadTextFile, getFileName } from "./common";
 
-const FORMAT_VERSION = "2";
+const FORMAT_VERSION = "3";
+const PREVIOUS_FORMAT_VERSION = "2";
 const LEGACY_FORMAT_VERSION = "1";
 
 type CachedCourse = Course & {
@@ -196,6 +197,14 @@ export function serializePlanFile(plan: StudyPlan): string {
       "credits",
       "department",
       "metadata_fallback",
+      "metadata_source",
+      "availability",
+      "catalog_title",
+      "catalog_description",
+      "catalog_department_code",
+      "catalog_department_name",
+      "catalog_year",
+      "catalog_url",
     ]),
     ...[...coursesByCode.values()].map((course) =>
       csvRow([
@@ -204,6 +213,14 @@ export function serializePlanFile(plan: StudyPlan): string {
         course.credits,
         course.department ?? "",
         course.metadataFallback ? "true" : "false",
+        course.metadataSource ?? "",
+        course.availability ?? "",
+        course.catalog?.title ?? "",
+        course.catalog?.description ?? "",
+        course.catalog?.departmentCode ?? "",
+        course.catalog?.departmentName ?? "",
+        course.catalog?.catalogYear ?? "",
+        course.catalog?.catalogUrl ?? "",
       ]),
     ),
     "",
@@ -241,6 +258,7 @@ export function parsePlanFile(text: string): ParsedPlanFile {
   const formatVersion = metadata.get("format_version");
   if (
     formatVersion !== FORMAT_VERSION &&
+    formatVersion !== PREVIOUS_FORMAT_VERSION &&
     formatVersion !== LEGACY_FORMAT_VERSION
   ) {
     throw new PlanFileError("Unsupported or missing plan format version.");
@@ -314,14 +332,22 @@ export function parsePlanFile(text: string): ParsedPlanFile {
   const courseRows = sections.get("courses");
   const cachedCourses: CachedCourse[] = [];
 
-  if (formatVersion === FORMAT_VERSION) {
+  if (
+    formatVersion === FORMAT_VERSION ||
+    formatVersion === PREVIOUS_FORMAT_VERSION
+  ) {
     if (!courseRows) {
       throw new PlanFileError("Missing required [courses] section.");
     }
-    if (
-      courseRows[0]?.map((cell) => cell.trim()).join(",") !==
-      "code,name,credits,department,metadata_fallback"
-    ) {
+    const header = courseRows[0]?.map((cell) => cell.trim()) ?? [];
+    const headerText = header.join(",");
+    const isPreviousHeader =
+      headerText === "code,name,credits,department,metadata_fallback";
+    const isCurrentHeader =
+      headerText ===
+      "code,name,credits,department,metadata_fallback,metadata_source,availability,catalog_title,catalog_description,catalog_department_code,catalog_department_name,catalog_year,catalog_url";
+
+    if (!isPreviousHeader && !isCurrentHeader) {
       throw new PlanFileError("The [courses] header is invalid.");
     }
 
@@ -331,6 +357,14 @@ export function parsePlanFile(text: string): ParsedPlanFile {
       const credits = Number(row[2]);
       const department = row[3]?.trim().toUpperCase() || undefined;
       const fallbackText = row[4]?.trim().toLowerCase();
+      const metadataSource = row[5]?.trim() || undefined;
+      const availability = row[6]?.trim() || undefined;
+      const catalogTitle = row[7]?.trim() || undefined;
+      const catalogDescription = row[8]?.trim() || undefined;
+      const catalogDepartmentCode = row[9]?.trim() || undefined;
+      const catalogDepartmentName = row[10]?.trim() || undefined;
+      const catalogYear = row[11]?.trim() || undefined;
+      const catalogUrl = row[12]?.trim() || undefined;
 
       if (
         !code ||
@@ -349,6 +383,32 @@ export function parsePlanFile(text: string): ParsedPlanFile {
         name: courseName,
         credits,
         department,
+        ...(metadataSource
+          ? { metadataSource: metadataSource as CachedCourse["metadataSource"] }
+          : {}),
+        ...(availability
+          ? { availability: availability as CachedCourse["availability"] }
+          : {}),
+        ...(catalogTitle ||
+        catalogDescription ||
+        catalogDepartmentCode ||
+        catalogDepartmentName ||
+        catalogYear ||
+        catalogUrl
+          ? {
+              catalog: {
+                title: catalogTitle,
+                description: catalogDescription,
+                departmentCode: catalogDepartmentCode,
+                departmentName: catalogDepartmentName,
+                catalogYear:
+                  catalogYear === "2026"
+                    ? "2026"
+                    : undefined,
+                catalogUrl,
+              },
+            }
+          : {}),
         ...(fallbackText === "true" ? { metadataFallback: true } : {}),
       });
     }
