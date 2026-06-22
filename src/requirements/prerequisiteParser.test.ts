@@ -29,13 +29,13 @@ describe("prerequisite expression parsing", () => {
     );
 
     expect(formatRequirementExpression(resolved!)).toBe(
-      "((ISIS-1221 O ISIS-1222) Y MATE-1201)",
+      "((ISIS-1221 O ISIS-1222) Y (MATE-1201 O MATE1 O MATS1))",
     );
   });
 
   it("fails open for malformed or entirely abstract expressions", () => {
     expect(parsePrerequisiteExpression("(ISIS 1221 Y")).toBeNull();
-    const abstract = parsePrerequisiteExpression("MATE1 O MATS1")!;
+    const abstract = parsePrerequisiteExpression("ABCD1 O WXYZ1")!;
     expect(resolveRequirementExpression(abstract, new Set())).toBeNull();
   });
 });

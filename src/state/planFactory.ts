@@ -105,6 +105,7 @@ export function createBlankPlan(
     creditLimitPerSemester: DEFAULT_CREDIT_LIMIT,
     semesters: createSemesters(semesterCount),
     storage: [],
+    recognizedRequirementIds: [],
   };
 }
 

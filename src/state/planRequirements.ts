@@ -10,7 +10,7 @@ import {
 } from "../requirements/prerequisiteParser";
 
 export const COURSE_REQUIREMENTS_CACHE_KEY =
-  "plangrid.courseRequirements.202620.v1";
+  "plangrid.courseRequirements.202620.v2";
 const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const REQUIREMENTS_CONCURRENCY = 4;
 

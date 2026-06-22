@@ -1,9 +1,16 @@
 import type { RequirementExpression } from "../models/courseRequirement";
 import { normalizeCourseCode } from "../catalog/normalize";
+import { recognizedRequirementAliasCodes } from "../models/recognizedRequirement";
 
 type Token =
   | { type: "course"; value: string }
   | { type: "and" | "or" | "left" | "right" };
+
+function normalizeRequirementToken(value: string): string {
+  const clean = value.replace(/\*$/, "").replace(/[^A-Z0-9]/g, "");
+  const match = /^([A-Z]{3,5})([0-9][A-Z0-9]{0,5})$/.exec(clean);
+  return match ? `${match[1]}-${match[2]}` : normalizeCourseCode(value);
+}
 
 function tokenize(value: string): Token[] | null {
   const tokens: Token[] = [];
@@ -31,7 +38,7 @@ function tokenize(value: string): Token[] | null {
     else {
       tokens.push({
         type: "course",
-        value: normalizeCourseCode(raw.replace(/\*$/, "")),
+        value: normalizeRequirementToken(raw),
       });
     }
     index = pattern.lastIndex;
@@ -110,7 +117,10 @@ export function resolveRequirementExpression(
   catalogCodes: ReadonlySet<string>,
 ): RequirementExpression | null {
   if (expression.type === "course") {
-    return catalogCodes.has(expression.code) ? expression : null;
+    return catalogCodes.has(expression.code) ||
+      recognizedRequirementAliasCodes.has(expression.code)
+      ? expression
+      : null;
   }
 
   const children = expression.children
@@ -146,7 +156,11 @@ export function evaluateRequirementExpression(
 export function formatRequirementExpression(
   expression: RequirementExpression,
 ): string {
-  if (expression.type === "course") return expression.code;
+  if (expression.type === "course") {
+    return recognizedRequirementAliasCodes.has(expression.code)
+      ? expression.code.replace("-", "")
+      : expression.code;
+  }
   const operator = expression.type === "and" ? " Y " : " O ";
   return `(${expression.children.map(formatRequirementExpression).join(operator)})`;
 }

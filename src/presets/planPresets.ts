@@ -8,6 +8,7 @@ import {
 } from "../state/courseHydration";
 import blankPresetData from "./blank-8-semesters.json";
 import isisPresetData from "./isis-2026-20-starter.json";
+import type { RecognizedRequirementId } from "../models/recognizedRequirement";
 
 export type PlanPreset = {
   id: string;
@@ -21,6 +22,7 @@ export type PlanPreset = {
     courseCodes: string[];
   }>;
   storageCourseCodes: string[];
+  recognizedRequirementIds?: RecognizedRequirementId[];
 };
 
 export type LoadedPreset = {
@@ -130,6 +132,7 @@ export async function loadPlanPreset(
         courses: semester.courseCodes.map(courseFor),
       })),
       storage: preset.storageCourseCodes.map(courseFor),
+      recognizedRequirementIds: preset.recognizedRequirementIds ?? [],
     },
     fallbackCodes: hydrated.fallbackCodes,
   };

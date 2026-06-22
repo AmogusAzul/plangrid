@@ -16,10 +16,15 @@ import {
   parsePrerequisiteExpression,
 } from "../requirements/prerequisiteParser";
 import type { CourseRequirementCheck } from "../models/courseRequirement";
+import {
+  recognizedRequirementDefinitions,
+  type RecognizedRequirementId,
+} from "../models/recognizedRequirement";
 
-const FORMAT_VERSION = "4";
-const PREVIOUS_FORMAT_VERSION = "3";
-const SECOND_PREVIOUS_FORMAT_VERSION = "2";
+const FORMAT_VERSION = "5";
+const PREVIOUS_FORMAT_VERSION = "4";
+const SECOND_PREVIOUS_FORMAT_VERSION = "3";
+const THIRD_PREVIOUS_FORMAT_VERSION = "2";
 const LEGACY_FORMAT_VERSION = "1";
 
 type CachedCourse = Course & {
@@ -42,6 +47,7 @@ export type ParsedPlanFile = {
   }>;
   storageCodes: string[];
   cachedCourses: CachedCourse[];
+  recognizedRequirementIds: RecognizedRequirementId[];
 };
 
 export type ImportedPlan = {
@@ -196,6 +202,10 @@ export function serializePlanFile(plan: StudyPlan): string {
     csvRow(["updated_at", plan.updatedAt]),
     csvRow(["credit_limit", plan.creditLimitPerSemester]),
     "",
+    "[recognized_requirements]",
+    csvRow(["id"]),
+    ...plan.recognizedRequirementIds.map((id) => csvRow([id])),
+    "",
     "[courses]",
     csvRow([
       "code",
@@ -311,6 +321,7 @@ export function parsePlanFile(text: string): ParsedPlanFile {
     formatVersion !== FORMAT_VERSION &&
     formatVersion !== PREVIOUS_FORMAT_VERSION &&
     formatVersion !== SECOND_PREVIOUS_FORMAT_VERSION &&
+    formatVersion !== THIRD_PREVIOUS_FORMAT_VERSION &&
     formatVersion !== LEGACY_FORMAT_VERSION
   ) {
     throw new PlanFileError("Unsupported or missing plan format version.");
@@ -387,7 +398,8 @@ export function parsePlanFile(text: string): ParsedPlanFile {
   if (
     formatVersion === FORMAT_VERSION ||
     formatVersion === PREVIOUS_FORMAT_VERSION ||
-    formatVersion === SECOND_PREVIOUS_FORMAT_VERSION
+    formatVersion === SECOND_PREVIOUS_FORMAT_VERSION ||
+    formatVersion === THIRD_PREVIOUS_FORMAT_VERSION
   ) {
     if (!courseRows) {
       throw new PlanFileError("Missing required [courses] section.");
@@ -467,7 +479,10 @@ export function parsePlanFile(text: string): ParsedPlanFile {
     }
   }
 
-  if (formatVersion === FORMAT_VERSION) {
+  if (
+    formatVersion === FORMAT_VERSION ||
+    formatVersion === PREVIOUS_FORMAT_VERSION
+  ) {
     const checkRows = requireSection(sections, "requirement_checks");
     const prerequisiteRows = requireSection(sections, "prerequisites");
     const corequisiteRows = requireSection(sections, "corequisites");
@@ -532,6 +547,26 @@ export function parsePlanFile(text: string): ParsedPlanFile {
     }
   }
 
+  const recognizedRequirementIds: RecognizedRequirementId[] = [];
+  if (formatVersion === FORMAT_VERSION) {
+    const recognizedRows = requireSection(sections, "recognized_requirements");
+    if (recognizedRows[0]?.[0]?.trim() !== "id") {
+      throw new PlanFileError(
+        "The [recognized_requirements] header is invalid.",
+      );
+    }
+    const validIds = new Set(
+      recognizedRequirementDefinitions.map((definition) => definition.id),
+    );
+    for (const row of recognizedRows.slice(1)) {
+      const id = row[0]?.trim() as RecognizedRequirementId;
+      if (!validIds.has(id)) {
+        throw new PlanFileError(`Unknown recognized requirement: ${id}.`);
+      }
+      recognizedRequirementIds.push(id);
+    }
+  }
+
   return {
     id,
     name,
@@ -541,6 +576,7 @@ export function parsePlanFile(text: string): ParsedPlanFile {
     semesters,
     storageCodes,
     cachedCourses,
+    recognizedRequirementIds,
   };
 }
 
@@ -610,6 +646,7 @@ export async function importPlanFile(
         fallbackSet.has(code) || cachedFallbackSet.has(code),
       ),
     ),
+    recognizedRequirementIds: parsed.recognizedRequirementIds,
   };
 
   return {

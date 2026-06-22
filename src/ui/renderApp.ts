@@ -34,7 +34,13 @@ import {
 } from "./courseDrag";
 import { captureAppScroll, restoreAppScroll } from "./appScroll";
 import { evaluatePlannedCourseRequirements } from "../requirements/evaluateCourseRequirements";
-import { requirementCodes } from "../requirements/prerequisiteParser";
+import {
+  formatRequirementExpression,
+} from "../requirements/prerequisiteParser";
+import {
+  recognizedRequirementDefinitions,
+  type RecognizedRequirementId,
+} from "../models/recognizedRequirement";
 
 type AppActions = {
   updatePlan: (update: (plan: StudyPlan) => StudyPlan) => void;
@@ -130,8 +136,8 @@ function requirementDetails(course: Course, plan: StudyPlan): string {
   const prerequisites = course.requirements.prerequisites
     .filter((rule) => rule.expression)
     .map((rule) => {
-      const codes = requirementCodes(rule.expression!);
-      return `<li><strong>${escapeHtml(codes.join(" / "))}</strong><span>${escapeHtml(rule.descriptionExpression || rule.codeExpression)}</span></li>`;
+      const expression = formatRequirementExpression(rule.expression!);
+      return `<li><strong>${escapeHtml(expression)}</strong><span>${escapeHtml(rule.descriptionExpression || rule.codeExpression)}</span></li>`;
     })
     .join("");
   const corequisites = course.requirements.corequisites
@@ -559,15 +565,40 @@ export function renderApp(
 
       <main class="${mainClass}">
         <section class="planner-toolbar">
-          <label class="roadmap-title" for="plan-name">
-            <span class="eyebrow">Academic roadmap</span>
-            <input
-              id="plan-name"
-              value="${escapeHtml(plan.name)}"
-              size="${Math.max(8, plan.name.length)}"
-              aria-label="Plan name"
-            />
-          </label>
+          <div class="roadmap-heading">
+            <label class="roadmap-title" for="plan-name">
+              <span class="eyebrow">Academic roadmap</span>
+              <input
+                id="plan-name"
+                value="${escapeHtml(plan.name)}"
+                size="${Math.max(8, plan.name.length)}"
+                aria-label="Plan name"
+              />
+            </label>
+            <details class="plan-options-menu">
+              <summary aria-label="Plan options" title="Plan options">...</summary>
+              <div class="plan-options-menu__panel">
+                <span class="eyebrow">Recognized requirements</span>
+                ${recognizedRequirementDefinitions
+                  .map(
+                    (definition) => `
+                      <label class="recognized-requirement-option">
+                        <input
+                          type="checkbox"
+                          data-recognized-requirement="${definition.id}"
+                          ${plan.recognizedRequirementIds.includes(definition.id) ? "checked" : ""}
+                        />
+                        <span>
+                          <strong>${escapeHtml(definition.label)}</strong>
+                          <small>${escapeHtml(definition.description)}</small>
+                        </span>
+                      </label>
+                    `,
+                  )
+                  .join("")}
+              </div>
+            </details>
+          </div>
           <div class="plan-stats">
             <div class="plan-total-card">
               <strong>${getTotalPlanCredits(plan)}</strong>
@@ -692,6 +723,24 @@ export function renderApp(
       ...current,
       creditLimitPerSemester: Math.min(30, Math.max(1, Math.trunc(limit))),
     }));
+  });
+
+  root.querySelectorAll<HTMLInputElement>("[data-recognized-requirement]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const id = input.dataset
+        .recognizedRequirement as RecognizedRequirementId | undefined;
+      if (!id) return;
+
+      actions.updatePlan((current) => {
+        const selected = new Set(current.recognizedRequirementIds);
+        if (input.checked) selected.add(id);
+        else selected.delete(id);
+        return {
+          ...current,
+          recognizedRequirementIds: [...selected],
+        };
+      });
+    });
   });
 
   function updateTermInput(

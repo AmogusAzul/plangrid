@@ -27,6 +27,9 @@ export function loadPlan(storage: Storage = localStorage): StudyPlan {
 
     return {
       ...parsed,
+      recognizedRequirementIds: Array.isArray(parsed.recognizedRequirementIds)
+        ? parsed.recognizedRequirementIds
+        : [],
       semesters: parsed.semesters.map((semester) => ({
         ...semester,
         courses: normalizeSemesterCourses(semester.courses),

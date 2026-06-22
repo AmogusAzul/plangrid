@@ -49,6 +49,49 @@ describe("course requirement evaluation", () => {
     );
   });
 
+  it("accepts same-semester prerequisites for 8-week target courses", () => {
+    const plan = createBlankPlan(1);
+    const target = course("target", "ESCR-1102", ["ESCR-1101"]);
+    target.requirements!.partOfTerm = "8A";
+    plan.semesters[0].courses.push(
+      course("first", "ESCR-1101"),
+      target,
+    );
+
+    expect(evaluatePlannedCourseRequirements(plan, "target").status).toBe(
+      "satisfied",
+    );
+
+    target.requirements!.partOfTerm = "1";
+    expect(evaluatePlannedCourseRequirements(plan, "target").status).toBe(
+      "unmet",
+    );
+  });
+
+  it("uses recognized precalculus aliases as fulfilled requirements", () => {
+    const plan = createBlankPlan(1);
+    plan.recognizedRequirementIds = ["homologated-precalculus"];
+    plan.semesters[0].courses.push(
+      course("target", "ISIS-1107", ["MATE-1"]),
+    );
+
+    expect(evaluatePlannedCourseRequirements(plan, "target").status).toBe(
+      "satisfied",
+    );
+  });
+
+  it("uses the recognized foreign-language requirement aliases", () => {
+    const plan = createBlankPlan(1);
+    plan.recognizedRequirementIds = ["foreign-language-requirement"];
+    plan.semesters[0].courses.push(
+      course("target", "ARQT-3214", ["ENGL-7"]),
+    );
+
+    expect(evaluatePlannedCourseRequirements(plan, "target").status).toBe(
+      "satisfied",
+    );
+  });
+
   it("requires corequisites in the exact same semester", () => {
     const plan = createBlankPlan(2);
     plan.semesters[0].courses.push(course("lab", "FISI-1518P"));

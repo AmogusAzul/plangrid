@@ -24,6 +24,7 @@ inside the application. The brand itself links back to this repository.
 - Storage area for unplaced courses
 - Duplicate-course, fallback-metadata, unverified, and semester-overload warnings
 - Advisory prerequisite/corequisite checks based on current `202620` offering details
+- Plan-level recognition for homologated precalculus and fulfilled language requirements
 - Browser autosave using `plangrid.currentPlan.v1`
 - Repository-backed blank and ISIS 2026-20 starter presets
 - Import and export through sectioned CSV `.plan` files
@@ -80,6 +81,12 @@ Prerequisite/corequisite checks use one representative current offering and
 only enforce course codes recognized by the 2026 catalog. Abstract or
 unrecognized requirement text is ignored. These warnings are planning guidance,
 not official academic validation.
+
+Eight-week (`8A`/`8B`) target courses may satisfy prerequisites with courses in
+the same semester. Plan options can mark homologated precalculus
+(`MATE-1201`/`MATE1`/`MATS1`) or the common Uniandes foreign-language aliases as
+already fulfilled. These recognitions are saved with the plan and exported in
+`.plan` format version 5.
 
 Rebuild the static catalog index with:
 

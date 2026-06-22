@@ -54,7 +54,7 @@ describe("plan file export", () => {
 
     expect(text).toContain('plan_name,"Plan, ""Special"""');
     expect(text).toContain("[courses]");
-    expect(text).toContain("format_version,4");
+    expect(text).toContain("format_version,5");
     expect(text).toContain("metadata_source,availability");
     expect(text).toContain("ISIS-1221,Programming,3");
     expect(text).toContain("slot_10");
@@ -82,7 +82,7 @@ describe("plan file export", () => {
     const text = serializePlanFile(plan);
 
     expect(() =>
-      parsePlanFile(text.replace("format_version,4", "format_version,99")),
+      parsePlanFile(text.replace("format_version,5", "format_version,99")),
     ).toThrow(PlanFileError);
     expect(() =>
       parsePlanFile(text.replace("[storage]", "[backlog]")),
@@ -199,8 +199,9 @@ describe("plan file import", () => {
     ).toBe(false);
   });
 
-  it("exports and imports catalog and requirement metadata in format version 4", async () => {
+  it("exports and imports catalog, requirement, and recognition metadata in format version 5", async () => {
     const plan = createBlankPlan(1);
+    plan.recognizedRequirementIds = ["homologated-precalculus"];
     plan.semesters[0].courses.push({
       id: "catalog-only",
       code: "DERE-3001",
@@ -241,6 +242,7 @@ describe("plan file import", () => {
     expect(text).toContain("[requirement_checks]");
     expect(text).toContain("[prerequisites]");
     expect(text).toContain("[corequisites]");
+    expect(text).toContain("[recognized_requirements]");
     expect(imported.plan.semesters[0].courses[0]).toEqual(
       expect.objectContaining({
         availability: "catalog-only",
@@ -261,6 +263,9 @@ describe("plan file import", () => {
         }),
       }),
     );
+    expect(imported.plan.recognizedRequirementIds).toEqual([
+      "homologated-precalculus",
+    ]);
   });
 
   it("uses persistent three-credit fallback metadata when lookup fails", async () => {

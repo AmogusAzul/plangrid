@@ -6,6 +6,7 @@ import {
   formatRequirementExpression,
   requirementCodes,
 } from "./prerequisiteParser";
+import { recognizedRequirementCodes } from "../models/recognizedRequirement";
 
 export type CourseRequirementEvaluation = {
   status: "unavailable" | "satisfied" | "unmet";
@@ -53,11 +54,29 @@ export function evaluatePlannedCourseRequirements(
       normalizeCourseCode(entry.code),
     ),
   );
+  const recognizedCodes = recognizedRequirementCodes(
+    plan.recognizedRequirementIds ?? [],
+  );
+  const acceptsSameSemesterPrerequisites = ["8A", "8B"].includes(
+    course.requirements.partOfTerm ?? "",
+  );
+  const availablePrerequisiteCodes = new Set([
+    ...earlierCodes,
+    ...recognizedCodes,
+    ...(acceptsSameSemesterPrerequisites ? sameSemesterCodes : []),
+  ]);
+  const availableCorequisiteCodes = new Set([
+    ...sameSemesterCodes,
+    ...recognizedCodes,
+  ]);
   const unmetPrerequisites = course.requirements.prerequisites
     .filter(
       (rule) =>
         rule.expression &&
-        !evaluateRequirementExpression(rule.expression, earlierCodes),
+        !evaluateRequirementExpression(
+          rule.expression,
+          availablePrerequisiteCodes,
+        ),
     )
     .map((rule) => ({
       codes: requirementCodes(rule.expression!),
@@ -65,7 +84,7 @@ export function evaluatePlannedCourseRequirements(
     }));
   const unmetCorequisites = course.requirements.corequisites
     .map((corequisite) => normalizeCourseCode(corequisite.code))
-    .filter((code) => !sameSemesterCodes.has(code));
+    .filter((code) => !availableCorequisiteCodes.has(code));
 
   return {
     status:

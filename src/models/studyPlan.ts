@@ -1,4 +1,5 @@
 import type { PlannedCourse } from "./course";
+import type { RecognizedRequirementId } from "./recognizedRequirement";
 
 export type PlanSemester = {
   id: string;
@@ -15,5 +16,5 @@ export type StudyPlan = {
   creditLimitPerSemester: number;
   semesters: PlanSemester[];
   storage: PlannedCourse[];
+  recognizedRequirementIds: RecognizedRequirementId[];
 };
-

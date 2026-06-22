@@ -59,6 +59,7 @@ async function main(): Promise<void> {
       courseCodes: semester.courses.map((course) => course.code),
     })),
     storageCourseCodes: parsed.storageCodes,
+    recognizedRequirementIds: parsed.recognizedRequirementIds,
   };
 
   await writeFile(outputPath, `${JSON.stringify(preset, null, 2)}\n`);

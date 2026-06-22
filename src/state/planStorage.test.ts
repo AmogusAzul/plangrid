@@ -56,5 +56,19 @@ describe("planStorage", () => {
       loaded.semesters[0].courses.map((course) => course.slotStart),
     ).toEqual([1, 4]);
   });
-});
 
+  it("defaults old stored plans to no recognized requirements", () => {
+    const storage = {
+      getItem: () =>
+        JSON.stringify({
+          id: "old",
+          name: "Old plan",
+          creditLimitPerSemester: 21,
+          semesters: [],
+          storage: [],
+        }),
+    } as unknown as Storage;
+
+    expect(loadPlan(storage).recognizedRequirementIds).toEqual([]);
+  });
+});
