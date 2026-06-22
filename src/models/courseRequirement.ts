@@ -1,5 +1,5 @@
 export type RequirementExpression =
-  | { type: "course"; code: string }
+  | { type: "course"; code: string; concurrent: boolean }
   | { type: "and" | "or"; children: RequirementExpression[] };
 
 export type PrerequisiteRule = {

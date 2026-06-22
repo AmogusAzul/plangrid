@@ -2,9 +2,9 @@ import { normalizeCourseCode } from "../catalog/normalize";
 import type { PlannedCourse } from "../models/course";
 import type { StudyPlan } from "../models/studyPlan";
 import {
-  evaluateRequirementExpression,
   formatRequirementExpression,
   requirementCodes,
+  residualRequirementExpression,
 } from "./prerequisiteParser";
 import { recognizedRequirementCodes } from "../models/recognizedRequirement";
 
@@ -13,6 +13,8 @@ export type CourseRequirementEvaluation = {
   unmetPrerequisites: Array<{
     codes: string[];
     expression: string;
+    originalExpression: string;
+    ruleIndex: number;
   }>;
   unmetCorequisites: string[];
 };
@@ -60,28 +62,35 @@ export function evaluatePlannedCourseRequirements(
   const acceptsSameSemesterPrerequisites = ["8A", "8B"].includes(
     course.requirements.partOfTerm ?? "",
   );
-  const availablePrerequisiteCodes = new Set([
-    ...earlierCodes,
-    ...recognizedCodes,
-    ...(acceptsSameSemesterPrerequisites ? sameSemesterCodes : []),
-  ]);
   const availableCorequisiteCodes = new Set([
     ...sameSemesterCodes,
     ...recognizedCodes,
   ]);
   const unmetPrerequisites = course.requirements.prerequisites
+    .map((rule, ruleIndex) => {
+      if (!rule.expression) return null;
+      const residual = residualRequirementExpression(
+        rule.expression,
+        (requirement) =>
+          recognizedCodes.has(requirement.code) ||
+          earlierCodes.has(requirement.code) ||
+          ((requirement.concurrent || acceptsSameSemesterPrerequisites) &&
+            sameSemesterCodes.has(requirement.code)),
+      );
+      if (!residual) return null;
+      return {
+        codes: requirementCodes(residual),
+        expression: formatRequirementExpression(residual),
+        originalExpression: formatRequirementExpression(rule.expression),
+        ruleIndex,
+      };
+    })
     .filter(
-      (rule) =>
-        rule.expression &&
-        !evaluateRequirementExpression(
-          rule.expression,
-          availablePrerequisiteCodes,
-        ),
-    )
-    .map((rule) => ({
-      codes: requirementCodes(rule.expression!),
-      expression: formatRequirementExpression(rule.expression!),
-    }));
+      (
+        rule,
+      ): rule is CourseRequirementEvaluation["unmetPrerequisites"][number] =>
+        rule !== null,
+    );
   const unmetCorequisites = course.requirements.corequisites
     .map((corequisite) => normalizeCourseCode(corequisite.code))
     .filter((code) => !availableCorequisiteCodes.has(code));

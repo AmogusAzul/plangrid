@@ -1090,9 +1090,24 @@ button {
 
 .requirement-list li {
   display: grid;
-  gap: 2px;
+  gap: 4px;
   border-left: 2px solid #d7ded5;
   padding-left: 9px;
+}
+
+.requirement-list__item--satisfied {
+  border-left-color: #6e9576 !important;
+}
+
+.requirement-list__item--unmet {
+  border-left-color: #d29b36 !important;
+}
+
+.requirement-list__item > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .requirement-list strong {
@@ -1101,10 +1116,33 @@ button {
 }
 
 .requirement-list span,
+.requirement-list small,
 .requirement-source {
   color: #7a877e;
   font-size: 10px;
   line-height: 1.4;
+}
+
+.requirement-list small {
+  display: block;
+}
+
+.requirement-rule-state {
+  flex: 0 0 auto;
+  font-weight: 800;
+}
+
+.requirement-list__item--satisfied .requirement-rule-state {
+  color: #3f714b;
+}
+
+.requirement-list__item--unmet .requirement-rule-state,
+.requirement-residual {
+  color: #7b531b !important;
+}
+
+.requirement-residual {
+  font-weight: 700;
 }
 
 .requirement-source {

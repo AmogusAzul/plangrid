@@ -3,7 +3,7 @@ import { normalizeCourseCode } from "../catalog/normalize";
 import { recognizedRequirementAliasCodes } from "../models/recognizedRequirement";
 
 type Token =
-  | { type: "course"; value: string }
+  | { type: "course"; value: string; concurrent: boolean }
   | { type: "and" | "or" | "left" | "right" };
 
 function normalizeRequirementToken(value: string): string {
@@ -39,6 +39,7 @@ function tokenize(value: string): Token[] | null {
       tokens.push({
         type: "course",
         value: normalizeRequirementToken(raw),
+        concurrent: raw.endsWith("*"),
       });
     }
     index = pattern.lastIndex;
@@ -60,7 +61,11 @@ export function parsePrerequisiteExpression(
     if (!token) return null;
     if (token.type === "course") {
       index += 1;
-      return { type: "course", code: token.value };
+      return {
+        type: "course",
+        code: token.value,
+        concurrent: token.concurrent,
+      };
     }
     if (token.type === "left") {
       index += 1;
@@ -153,13 +158,41 @@ export function evaluateRequirementExpression(
       );
 }
 
+export function residualRequirementExpression(
+  expression: RequirementExpression,
+  isSatisfied: (requirement: Extract<
+    RequirementExpression,
+    { type: "course" }
+  >) => boolean,
+): RequirementExpression | null {
+  if (expression.type === "course") {
+    return isSatisfied(expression) ? null : expression;
+  }
+
+  const residuals = expression.children.map((child) =>
+    residualRequirementExpression(child, isSatisfied),
+  );
+
+  if (expression.type === "or" && residuals.some((child) => child === null)) {
+    return null;
+  }
+
+  const children = residuals.filter(
+    (child): child is RequirementExpression => child !== null,
+  );
+  if (children.length === 0) return null;
+  if (children.length === 1) return children[0];
+  return { type: expression.type, children };
+}
+
 export function formatRequirementExpression(
   expression: RequirementExpression,
 ): string {
   if (expression.type === "course") {
-    return recognizedRequirementAliasCodes.has(expression.code)
+    const code = recognizedRequirementAliasCodes.has(expression.code)
       ? expression.code.replace("-", "")
       : expression.code;
+    return `${code}${expression.concurrent ? "*" : ""}`;
   }
   const operator = expression.type === "and" ? " Y " : " O ";
   return `(${expression.children.map(formatRequirementExpression).join(operator)})`;

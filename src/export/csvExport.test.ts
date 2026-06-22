@@ -228,7 +228,11 @@ describe("plan file import", () => {
           {
             codeExpression: "DERE 1001",
             descriptionExpression: "Introduccion al Derecho",
-            expression: { type: "course", code: "DERE-1001" },
+            expression: {
+              type: "course",
+              code: "DERE-1001",
+              concurrent: true,
+            },
           },
         ],
         corequisites: [{ code: "DERE-3001L", title: "Laboratorio" }],
@@ -243,6 +247,7 @@ describe("plan file import", () => {
     expect(text).toContain("[prerequisites]");
     expect(text).toContain("[corequisites]");
     expect(text).toContain("[recognized_requirements]");
+    expect(text).toContain("DERE-1001*");
     expect(imported.plan.semesters[0].courses[0]).toEqual(
       expect.objectContaining({
         availability: "catalog-only",
@@ -256,7 +261,11 @@ describe("plan file import", () => {
           nrc: "12345",
           prerequisites: [
             expect.objectContaining({
-              expression: { type: "course", code: "DERE-1001" },
+              expression: {
+                type: "course",
+                code: "DERE-1001",
+                concurrent: true,
+              },
             }),
           ],
           corequisites: [{ code: "DERE-3001L", title: "Laboratorio" }],

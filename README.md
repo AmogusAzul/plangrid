@@ -47,19 +47,24 @@ plan after confirmation.
 
 ## Plan Files
 
-`.plan` files are human-readable CSV documents containing three tables:
+`.plan` files are human-readable CSV documents containing sectioned tables:
 
 - `[plan]` stores the format version, plan name, and credit limit.
+- `[courses]` stores reusable course and catalog metadata.
+- `[requirement_checks]`, `[prerequisites]`, and `[corequisites]` store
+  advisory requirement metadata.
+- `[recognized_requirements]` stores plan-level fulfilled requirement options.
 - `[semesters]` stores semester labels, terms, and course starting slots.
 - `[storage]` stores unplaced course codes.
 
 The file stores course codes, names, credits, departments, source/availability
 metadata, catalog summaries, plan timestamps, semester placement, and fallback
-status. Format version 4 preserves catalog-only courses and requirement checks
-through readable metadata tables. During import, PlanGrid still requests current metadata from
-the Uniandes course service. Fresh API metadata takes priority for current
-planning fields; embedded catalog metadata is preserved for details and used
-when the service is unavailable or no course is returned. A synthetic
+status. Format version 5 preserves catalog-only courses, requirement checks,
+recognized requirements, and concurrent prerequisite `*` markers through
+readable metadata tables. During import, PlanGrid still requests current
+metadata from the Uniandes course service. Fresh API metadata takes priority
+for current planning fields; embedded catalog metadata is preserved for details
+and used when the service is unavailable or no course is returned. A synthetic
 three-credit card and visible warning are used only when neither source has
 metadata.
 
@@ -83,10 +88,14 @@ unrecognized requirement text is ignored. These warnings are planning guidance,
 not official academic validation.
 
 Eight-week (`8A`/`8B`) target courses may satisfy prerequisites with courses in
-the same semester. Plan options can mark homologated precalculus
-(`MATE-1201`/`MATE1`/`MATS1`) or the common Uniandes foreign-language aliases as
-already fulfilled. These recognitions are saved with the plan and exported in
-`.plan` format version 5.
+the same semester. A prerequisite marked with `*` by the API can also be taken
+in the same semester as its target, regardless of the target's duration.
+Requirement warnings simplify compound rules to show only the branches that
+are still unmet; the details drawer retains the full normalized rule and
+original API expression for reference. Plan options can mark homologated
+precalculus (`MATE-1201`/`MATE1`/`MATS1`) or the common Uniandes
+foreign-language aliases as already fulfilled. These recognitions are saved
+with the plan and exported in `.plan` format version 5.
 
 Rebuild the static catalog index with:
 

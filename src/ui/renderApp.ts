@@ -114,7 +114,7 @@ export function courseCard(
   `;
 }
 
-function requirementDetails(course: Course, plan: StudyPlan): string {
+export function requirementDetails(course: Course, plan: StudyPlan): string {
   if (!course.requirements) {
     return `
       <section>
@@ -137,11 +137,48 @@ function requirementDetails(course: Course, plan: StudyPlan): string {
     "id" in course && typeof course.id === "string"
       ? evaluatePlannedCourseRequirements(plan, course.id)
       : null;
+  const unmetPrerequisites = new Map(
+    evaluation?.unmetPrerequisites.map((requirement) => [
+      requirement.ruleIndex,
+      requirement,
+    ]) ?? [],
+  );
   const prerequisites = course.requirements.prerequisites
-    .filter((rule) => rule.expression)
-    .map((rule) => {
+    .map((rule, ruleIndex) => {
+      if (!rule.expression) return "";
       const expression = formatRequirementExpression(rule.expression!);
-      return `<li><strong>${escapeHtml(expression)}</strong><span>${escapeHtml(rule.descriptionExpression || rule.codeExpression)}</span></li>`;
+      const unmet = unmetPrerequisites.get(ruleIndex);
+      const status =
+        !evaluation || evaluation.status === "unavailable"
+          ? "Not evaluated"
+          : unmet
+            ? "Unmet"
+            : "Satisfied";
+      const statusClass =
+        !evaluation || evaluation.status === "unavailable"
+          ? "unavailable"
+          : unmet
+            ? "unmet"
+            : "satisfied";
+      return `
+        <li class="requirement-list__item requirement-list__item--${statusClass}">
+          <div>
+            <strong>${escapeHtml(expression)}</strong>
+            <span class="requirement-rule-state">${status}</span>
+          </div>
+          ${
+            unmet
+              ? `<p class="requirement-residual">Still needed: ${escapeHtml(unmet.expression)}</p>`
+              : ""
+          }
+          ${
+            rule.descriptionExpression
+              ? `<span>${escapeHtml(rule.descriptionExpression)}</span>`
+              : ""
+          }
+          <small>API expression: ${escapeHtml(rule.codeExpression)}</small>
+        </li>
+      `;
     })
     .join("");
   const corequisites = course.requirements.corequisites

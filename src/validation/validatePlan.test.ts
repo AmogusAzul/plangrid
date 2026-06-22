@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parsePrerequisiteExpression } from "../requirements/prerequisiteParser";
 import { createBlankPlan } from "../state/planFactory";
 import { getTotalPlanCredits, validatePlan } from "./validatePlan";
 
@@ -163,7 +164,11 @@ describe("validatePlan", () => {
           {
             codeExpression: "MATE 1203",
             descriptionExpression: "Calculo",
-            expression: { type: "course", code: "MATE-1203" },
+            expression: {
+              type: "course",
+              code: "MATE-1203",
+              concurrent: false,
+            },
           },
         ],
         corequisites: [{ code: "FISI-1518P", title: "Laboratorio" }],
@@ -180,5 +185,41 @@ describe("validatePlan", () => {
         }),
       ]),
     );
+  });
+
+  it("reports only residual prerequisite branches in warnings", () => {
+    const plan = createBlankPlan(1);
+    plan.recognizedRequirementIds = ["foreign-language-requirement"];
+    plan.semesters[0].courses.push({
+      id: "target",
+      code: "ISIS-3311",
+      name: "Infrastructure",
+      credits: 3,
+      requirements: {
+        status: "loaded",
+        term: "202620",
+        checkedAt: "2026-06-22T00:00:00.000Z",
+        prerequisites: [
+          {
+            codeExpression:
+              "(ISIS 3204 O ISIS 2311) Y (ENGL7 O INGL4)",
+            descriptionExpression:
+              "Networking and foreign-language requirement",
+            expression: parsePrerequisiteExpression(
+              "(ISIS 3204 O ISIS 2311) Y (ENGL7 O INGL4)",
+            )!,
+          },
+        ],
+        corequisites: [],
+      },
+    });
+
+    const warning = validatePlan(plan).find(
+      (entry) => entry.id === "requirements-target",
+    );
+
+    expect(warning?.message).toContain("(ISIS-3204 O ISIS-2311)");
+    expect(warning?.message).not.toContain("ENGL7");
+    expect(warning?.relatedCourseCodes).not.toContain("ENGL-7");
   });
 });

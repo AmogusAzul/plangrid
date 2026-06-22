@@ -14,9 +14,18 @@ describe("prerequisite expression parsing", () => {
 
     expect(parsed).not.toBeNull();
     expect(formatRequirementExpression(parsed!)).toContain("FISI-1100");
+    expect(formatRequirementExpression(parsed!)).toContain("MATE-1203*");
     expect(
       evaluateRequirementExpression(parsed!, new Set(["MATE-1203"])),
     ).toBe(true);
+  });
+
+  it("preserves a concurrent marker on a single prerequisite leaf", () => {
+    expect(parsePrerequisiteExpression("MATE 1203*")).toEqual({
+      type: "course",
+      code: "MATE-1203",
+      concurrent: true,
+    });
   });
 
   it("removes catalog-unknown abstract leaves and simplifies groups", () => {
