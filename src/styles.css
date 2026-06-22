@@ -995,7 +995,7 @@ button {
   min-height: 76px;
   overflow: hidden;
   border-radius: 9px;
-  padding: 9px 10px;
+  padding: 9px 32px 9px 10px;
   color: white;
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.13), transparent 45%),
@@ -1167,7 +1167,7 @@ button {
 .course-card__warning {
   position: absolute;
   top: 6px;
-  right: 6px;
+  right: 30px;
   display: grid;
   width: 17px;
   height: 17px;
@@ -1181,31 +1181,33 @@ button {
 
 .course-card__actions {
   position: absolute;
+  top: 5px;
   right: 5px;
   bottom: 5px;
-  display: flex;
-  gap: 3px;
-  opacity: 0;
-  transition: opacity 120ms ease;
+  display: grid;
+  grid-template-rows: repeat(2, 1fr);
+  width: 22px;
+  gap: 4px;
 }
 
 .course-card__action {
+  display: grid;
+  width: 22px;
+  min-height: 0;
+  place-items: center;
   border: 0;
   border-radius: 5px;
-  padding: 3px 5px;
+  padding: 0;
   color: white;
   background: rgba(0, 0, 0, 0.22);
-  font-size: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .course-card__action:disabled {
   cursor: not-allowed;
   opacity: 0.48;
-}
-
-.course-card:hover .course-card__actions,
-.course-card:focus-within .course-card__actions {
-  opacity: 1;
 }
 
 .disclaimer {

@@ -67,11 +67,10 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#039;");
 }
 
-function courseCard(
+export function courseCard(
   course: PlannedCourse,
   affectedCourseCodes: Set<string>,
   affectedCourseIds: Set<string>,
-  location: "semester" | "storage",
   useMutedCatalogOnlyCards: boolean,
   position?: PositionedCourse,
 ): string {
@@ -80,10 +79,6 @@ function courseCard(
     affectedCourseCodes.has(course.code) || affectedCourseIds.has(course.id)
     ? '<span class="course-card__warning" role="img" aria-label="Course warning" title="Course warning">!</span>'
     : "";
-  const moveAction =
-    location === "semester"
-      ? `<button class="course-card__action" data-store-course="${escapeHtml(course.id)}" title="Move to storage">Store</button>`
-      : "";
   const isCatalogOnly = course.availability === "catalog-only";
   const source = course.availability ?? "api-available";
 
@@ -95,16 +90,25 @@ function courseCard(
       data-source="${escapeHtml(source)}"
       data-muted-catalog-only="${isCatalogOnly && useMutedCatalogOnlyCards ? "true" : "false"}"
       draggable="true"
-      title="Drag to another semester or storage"
+      title="${escapeHtml(`${course.code}\n${course.name}\n${course.credits} credits`)}"
     >
       ${warningBadge}
       <strong>${escapeHtml(course.code)}</strong>
       <span>${escapeHtml(course.name)}</span>
       <small>${course.credits} cr</small>
       <div class="course-card__actions">
-        ${moveAction}
-        <button class="course-card__action" data-course-details="${escapeHtml(course.id)}" title="Course details">Details</button>
-        <button class="course-card__action" data-remove-course="${escapeHtml(course.id)}" title="Remove course">Remove</button>
+        <button
+          class="course-card__action"
+          data-course-details="${escapeHtml(course.id)}"
+          title="Course details"
+          aria-label="Open details for ${escapeHtml(course.code)}"
+        >i</button>
+        <button
+          class="course-card__action"
+          data-remove-course="${escapeHtml(course.id)}"
+          title="Remove course"
+          aria-label="Remove ${escapeHtml(course.code)}"
+        >×</button>
       </div>
     </article>
   `;
@@ -470,7 +474,6 @@ export function renderApp(
                         course,
                         affectedCourseCodes,
                         affectedCourseIds,
-                        "storage",
                         searchAppearance.useMutedCatalogOnlyCards,
                       ),
                     )
@@ -676,7 +679,6 @@ export function renderApp(
                                 position.course,
                                 affectedCourseCodes,
                                 affectedCourseIds,
-                                "semester",
                                 searchAppearance.useMutedCatalogOnlyCards,
                                 position,
                               ),
@@ -848,16 +850,6 @@ export function renderApp(
       const courseId = button.dataset.removeCourse;
       if (!courseId) return;
       actions.updatePlan((current) => deleteCourse(current, courseId));
-    });
-  });
-
-  root.querySelectorAll<HTMLButtonElement>("[data-store-course]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const courseId = button.dataset.storeCourse;
-      if (!courseId) return;
-      actions.updatePlan((current) =>
-        moveCourse(current, courseId, STORAGE_DESTINATION),
-      );
     });
   });
 
