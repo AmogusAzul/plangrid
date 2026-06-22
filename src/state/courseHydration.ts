@@ -62,6 +62,7 @@ export async function hydrateCourses(
               ? "api+catalog" as const
               : "api" as const,
             catalog: cachedCourse?.catalog,
+            requirements: cachedCourse?.requirements,
             availability: "api-available" as const,
           }
         : cachedCourse;

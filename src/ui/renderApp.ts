@@ -33,6 +33,8 @@ import {
   type CourseDragPayload,
 } from "./courseDrag";
 import { captureAppScroll, restoreAppScroll } from "./appScroll";
+import { evaluatePlannedCourseRequirements } from "../requirements/evaluateCourseRequirements";
+import { requirementCodes } from "../requirements/prerequisiteParser";
 
 type AppActions = {
   updatePlan: (update: (plan: StudyPlan) => StudyPlan) => void;
@@ -62,12 +64,14 @@ function escapeHtml(value: string): string {
 function courseCard(
   course: PlannedCourse,
   affectedCourseCodes: Set<string>,
+  affectedCourseIds: Set<string>,
   location: "semester" | "storage",
   useMutedCatalogOnlyCards: boolean,
   position?: PositionedCourse,
 ): string {
   const palette = getCoursePalette(course);
-  const warningBadge = affectedCourseCodes.has(course.code)
+  const warningBadge =
+    affectedCourseCodes.has(course.code) || affectedCourseIds.has(course.id)
     ? '<span class="course-card__warning" role="img" aria-label="Course warning" title="Course warning">!</span>'
     : "";
   const moveAction =
@@ -97,6 +101,67 @@ function courseCard(
         <button class="course-card__action" data-remove-course="${escapeHtml(course.id)}" title="Remove course">Remove</button>
       </div>
     </article>
+  `;
+}
+
+function requirementDetails(course: Course, plan: StudyPlan): string {
+  if (!course.requirements) {
+    return `
+      <section>
+        <h3>Academic requirements</h3>
+        <p>Requirement information has not been loaded yet.</p>
+      </section>
+    `;
+  }
+
+  if (course.requirements.status === "not-offered") {
+    return `
+      <section>
+        <h3>Academic requirements</h3>
+        <p>No current 202620 offering was found, so requirements could not be checked.</p>
+      </section>
+    `;
+  }
+
+  const evaluation =
+    "id" in course && typeof course.id === "string"
+      ? evaluatePlannedCourseRequirements(plan, course.id)
+      : null;
+  const prerequisites = course.requirements.prerequisites
+    .filter((rule) => rule.expression)
+    .map((rule) => {
+      const codes = requirementCodes(rule.expression!);
+      return `<li><strong>${escapeHtml(codes.join(" / "))}</strong><span>${escapeHtml(rule.descriptionExpression || rule.codeExpression)}</span></li>`;
+    })
+    .join("");
+  const corequisites = course.requirements.corequisites
+    .map(
+      (corequisite) =>
+        `<li><strong>${escapeHtml(corequisite.code)}</strong><span>${escapeHtml(corequisite.title)}</span></li>`,
+    )
+    .join("");
+
+  return `
+    <section>
+      <h3>Academic requirements</h3>
+      <p class="requirement-status requirement-status--${evaluation?.status ?? "unavailable"}">
+        ${
+          evaluation?.status === "satisfied"
+            ? "Requirements are satisfied by the current plan placement."
+            : evaluation?.status === "unmet"
+              ? "Some requirements are not met by the current plan placement."
+              : "Place this course in a semester to evaluate its requirements."
+        }
+      </p>
+      ${prerequisites ? `<h4>Prerequisites</h4><ul class="requirement-list">${prerequisites}</ul>` : ""}
+      ${corequisites ? `<h4>Corequisites</h4><ul class="requirement-list">${corequisites}</ul>` : ""}
+      ${
+        !prerequisites && !corequisites
+          ? "<p>No enforceable catalog course requirements were found.</p>"
+          : ""
+      }
+      <p class="requirement-source">Checked from NRC ${escapeHtml(course.requirements.nrc ?? "unknown")} · part ${escapeHtml(course.requirements.partOfTerm ?? "unknown")} · term ${course.requirements.term}</p>
+    </section>
   `;
 }
 
@@ -222,7 +287,12 @@ export function renderApp(
   const scrollPosition = captureAppScroll(root);
   const warnings = validatePlan(plan);
   const affectedCourseCodes = new Set(
-    warnings.flatMap((warning) => warning.relatedCourseCodes ?? []),
+    warnings
+      .filter((warning) => !warning.relatedCourseIds?.length)
+      .flatMap((warning) => warning.relatedCourseCodes ?? []),
+  );
+  const affectedCourseIds = new Set(
+    warnings.flatMap((warning) => warning.relatedCourseIds ?? []),
   );
   const overloadedSemesters = new Set(
     warnings.flatMap((warning) => warning.relatedSemesterIds ?? []),
@@ -288,7 +358,7 @@ export function renderApp(
           <p>
             PlanGrid is an unofficial academic planning whiteboard. It helps students
             and advisors explore semester-by-semester plans; it does not certify degree
-            requirements.
+            requirements. Prerequisite and corequisite warnings are advisory.
           </p>
           <ol>
             <li>Start with a blank plan or a preset.</li>
@@ -303,7 +373,8 @@ export function renderApp(
           <p>
             PlanGrid es un tablero no oficial de planeación académica. Ayuda a
             estudiantes y consejeros a explorar planes semestre por semestre; no
-            certifica requisitos de grado.
+            certifica requisitos de grado. Las alertas de prerrequisitos y
+            correquisitos son informativas.
           </p>
           <ol>
             <li>Empieza con un plan vacío o una plantilla.</li>
@@ -345,6 +416,7 @@ export function renderApp(
                     ? `<a class="course-details__link" href="${escapeHtml(selectedDetailsCourse.catalog.catalogUrl)}" target="_blank" rel="noreferrer">Open catalog source</a>`
                     : ""
                 }
+                ${requirementDetails(selectedDetailsCourse, plan)}
               </div>
             </aside>`
           : ""
@@ -391,6 +463,7 @@ export function renderApp(
                       courseCard(
                         course,
                         affectedCourseCodes,
+                        affectedCourseIds,
                         "storage",
                         searchAppearance.useMutedCatalogOnlyCards,
                       ),
@@ -517,7 +590,8 @@ export function renderApp(
               const credits = sumCredits(semester.courses);
               const isOverloaded = overloadedSemesters.has(semester.id);
               const hasCourseWarning = semester.courses.some((course) =>
-                affectedCourseCodes.has(course.code),
+                affectedCourseCodes.has(course.code) ||
+                affectedCourseIds.has(course.id),
               );
               const hasWarning = isOverloaded || hasCourseWarning;
               const capacityPercent = Math.min(
@@ -570,6 +644,7 @@ export function renderApp(
                               courseCard(
                                 position.course,
                                 affectedCourseCodes,
+                                affectedCourseIds,
                                 "semester",
                                 searchAppearance.useMutedCatalogOnlyCards,
                                 position,

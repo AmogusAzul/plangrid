@@ -7,8 +7,9 @@ and shared without creating an account.
 
 [Open PlanGrid](https://amogusazul.github.io/plangrid/)
 
-PlanGrid is an unofficial tool. It does not validate prerequisites or official
-degree requirements.
+PlanGrid is an unofficial tool. It provides advisory prerequisite and
+corequisite warnings from current offering metadata, but does not certify
+official degree requirements.
 
 The `?` button beside the PlanGrid brand opens a short English/Spanish guide
 inside the application. The brand itself links back to this repository.
@@ -21,7 +22,8 @@ inside the application. The brand itself links back to this repository.
 - Catalog/API availability cues for the current 202620 offering API
 - Credit-sized cards with cell-snapped drag and drop
 - Storage area for unplaced courses
-- Duplicate-course, fallback-metadata, catalog-only, unverified, and semester-overload warnings
+- Duplicate-course, fallback-metadata, unverified, and semester-overload warnings
+- Advisory prerequisite/corequisite checks based on current `202620` offering details
 - Browser autosave using `plangrid.currentPlan.v1`
 - Repository-backed blank and ISIS 2026-20 starter presets
 - Import and export through sectioned CSV `.plan` files
@@ -52,8 +54,8 @@ plan after confirmation.
 
 The file stores course codes, names, credits, departments, source/availability
 metadata, catalog summaries, plan timestamps, semester placement, and fallback
-status. Format version 3 preserves catalog-only courses through a readable
-metadata table. During import, PlanGrid still requests current metadata from
+status. Format version 4 preserves catalog-only courses and requirement checks
+through readable metadata tables. During import, PlanGrid still requests current metadata from
 the Uniandes course service. Fresh API metadata takes priority for current
 planning fields; embedded catalog metadata is preserved for details and used
 when the service is unavailable or no course is returned. A synthetic
@@ -73,6 +75,11 @@ Availability labels mean only whether a course appears in the current `202620`
 offering API. They do not indicate seats, schedule fit, future offerings, degree
 validity, or requirement approval. Catalog-only courses can still be added as
 planning placeholders.
+
+Prerequisite/corequisite checks use one representative current offering and
+only enforce course codes recognized by the 2026 catalog. Abstract or
+unrecognized requirement text is ignored. These warnings are planning guidance,
+not official academic validation.
 
 Rebuild the static catalog index with:
 

@@ -54,7 +54,7 @@ describe("plan file export", () => {
 
     expect(text).toContain('plan_name,"Plan, ""Special"""');
     expect(text).toContain("[courses]");
-    expect(text).toContain("format_version,3");
+    expect(text).toContain("format_version,4");
     expect(text).toContain("metadata_source,availability");
     expect(text).toContain("ISIS-1221,Programming,3");
     expect(text).toContain("slot_10");
@@ -82,7 +82,7 @@ describe("plan file export", () => {
     const text = serializePlanFile(plan);
 
     expect(() =>
-      parsePlanFile(text.replace("format_version,3", "format_version,99")),
+      parsePlanFile(text.replace("format_version,4", "format_version,99")),
     ).toThrow(PlanFileError);
     expect(() =>
       parsePlanFile(text.replace("[storage]", "[backlog]")),
@@ -199,7 +199,7 @@ describe("plan file import", () => {
     ).toBe(false);
   });
 
-  it("exports and imports catalog metadata in format version 3", async () => {
+  it("exports and imports catalog and requirement metadata in format version 4", async () => {
     const plan = createBlankPlan(1);
     plan.semesters[0].courses.push({
       id: "catalog-only",
@@ -217,12 +217,30 @@ describe("plan file import", () => {
         catalogYear: "2026",
         catalogUrl: "https://example.test/dere-3001",
       },
+      requirements: {
+        status: "loaded",
+        term: "202620",
+        checkedAt: "2026-06-22T00:00:00.000Z",
+        nrc: "12345",
+        partOfTerm: "1",
+        prerequisites: [
+          {
+            codeExpression: "DERE 1001",
+            descriptionExpression: "Introduccion al Derecho",
+            expression: { type: "course", code: "DERE-1001" },
+          },
+        ],
+        corequisites: [{ code: "DERE-3001L", title: "Laboratorio" }],
+      },
     });
 
     const text = serializePlanFile(plan);
     const imported = await importPlanFile(text, async () => null);
 
     expect(text).toContain("catalog_description");
+    expect(text).toContain("[requirement_checks]");
+    expect(text).toContain("[prerequisites]");
+    expect(text).toContain("[corequisites]");
     expect(imported.plan.semesters[0].courses[0]).toEqual(
       expect.objectContaining({
         availability: "catalog-only",
@@ -230,6 +248,16 @@ describe("plan file import", () => {
         catalog: expect.objectContaining({
           description: "Estudia regulación ambiental.",
           catalogUrl: "https://example.test/dere-3001",
+        }),
+        requirements: expect.objectContaining({
+          status: "loaded",
+          nrc: "12345",
+          prerequisites: [
+            expect.objectContaining({
+              expression: { type: "course", code: "DERE-1001" },
+            }),
+          ],
+          corequisites: [{ code: "DERE-3001L", title: "Laboratorio" }],
         }),
       }),
     );

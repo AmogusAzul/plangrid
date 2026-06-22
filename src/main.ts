@@ -26,6 +26,10 @@ import {
 } from "./state/searchAppearance";
 import { loadCatalogDepartments } from "./catalog/catalogMetadata";
 import { enrichPlanWithCatalogDescriptions } from "./state/planCatalogDescriptions";
+import {
+  applyCachedRequirements,
+  refreshPlanRequirements,
+} from "./state/planRequirements";
 
 const root = document.querySelector<HTMLElement>("#app");
 
@@ -34,27 +38,39 @@ if (!root) {
 }
 
 const appRoot = root;
-let plan = loadPlan();
+let plan = applyCachedRequirements(loadPlan());
 let courseSearch: CourseSearchState = initialCourseSearchState;
 let searchAppearance = loadSearchAppearanceSettings();
 let selectedDetailsCourse: Course | null = null;
 let activeSearch = 0;
-let activePlanEnrichment = 0;
+let activePlanMetadataRefresh = 0;
 
-function updatePlanWithCatalogDescriptions(): void {
-  const enrichmentId = activePlanEnrichment + 1;
-  activePlanEnrichment = enrichmentId;
+function updatePlanMetadata(): void {
+  const refreshId = activePlanMetadataRefresh + 1;
+  activePlanMetadataRefresh = refreshId;
   const sourcePlan = plan;
 
-  void enrichPlanWithCatalogDescriptions(sourcePlan).then((enrichedPlan) => {
-    if (enrichmentId !== activePlanEnrichment || enrichedPlan === sourcePlan) {
-      return;
+  void enrichPlanWithCatalogDescriptions(sourcePlan)
+    .then((enrichedPlan) => refreshPlanRequirements(enrichedPlan))
+    .then((refreshedPlan) => {
+    if (refreshId !== activePlanMetadataRefresh) return;
+    plan = savePlan(refreshedPlan);
+    if (
+      selectedDetailsCourse &&
+      "id" in selectedDetailsCourse
+    ) {
+      const selectedId = String(
+        (selectedDetailsCourse as Course & { id: string }).id,
+      );
+      selectedDetailsCourse = [
+        ...plan.semesters.flatMap((semester) => semester.courses),
+        ...plan.storage,
+      ].find((course) => course.id === selectedId) ??
+        selectedDetailsCourse;
     }
-
-    plan = savePlan(enrichedPlan);
     render();
   }).catch(() => {
-    // Catalog details are helpful, but planning should keep working without them.
+    // Advisory metadata should never block plan editing.
   });
 }
 
@@ -75,7 +91,7 @@ function render(): void {
     updatePlan(update) {
       plan = savePlan(update(plan));
       render();
-      updatePlanWithCatalogDescriptions();
+      updatePlanMetadata();
     },
     resetPlan() {
       localStorage.removeItem(STORAGE_KEY);
@@ -93,7 +109,7 @@ function render(): void {
       const imported = await importPlanFile(await file.text());
       plan = savePlan(imported.plan);
       render();
-      updatePlanWithCatalogDescriptions();
+      updatePlanMetadata();
       return imported.fallbackCodes;
     },
     async loadPreset(presetId: string) {
@@ -105,7 +121,7 @@ function render(): void {
       const loaded = await loadPlanPreset(preset);
       plan = savePlan(loaded.plan);
       render();
-      updatePlanWithCatalogDescriptions();
+      updatePlanMetadata();
       return loaded.fallbackCodes;
     },
     updateSearchFilters(filters) {
@@ -180,5 +196,5 @@ function render(): void {
 }
 
 loadCachedCatalogDepartments();
-updatePlanWithCatalogDescriptions();
+updatePlanMetadata();
 render();

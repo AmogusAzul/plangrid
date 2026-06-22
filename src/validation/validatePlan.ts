@@ -2,6 +2,7 @@ import type { PlannedCourse } from "../models/course";
 import type { StudyPlan } from "../models/studyPlan";
 import type { PlanWarning } from "../models/warning";
 import { isRequirementCourseCode } from "../presets/mockCourses";
+import { allCoursesWithRequirementEvaluations } from "../requirements/evaluateCourseRequirements";
 
 export function sumCredits(courses: PlannedCourse[]): number {
   return courses.reduce((total, course) => total + course.credits, 0);
@@ -74,6 +75,41 @@ export function validatePlan(plan: StudyPlan): PlanWarning[] {
       relatedCourseCodes: [
         ...new Set(unknownAvailabilityCourses.map((course) => course.code)),
       ],
+    });
+  }
+
+  for (const { course, semesterId, evaluation } of
+    allCoursesWithRequirementEvaluations(plan)) {
+    if (evaluation.status !== "unmet") continue;
+
+    const parts: string[] = [];
+    if (evaluation.unmetPrerequisites.length > 0) {
+      parts.push(
+        `prerequisite ${evaluation.unmetPrerequisites
+          .map((requirement) => requirement.expression)
+          .join("; ")}`,
+      );
+    }
+    if (evaluation.unmetCorequisites.length > 0) {
+      parts.push(`corequisite ${evaluation.unmetCorequisites.join(", ")}`);
+    }
+    const relatedCodes = [
+      ...new Set([
+        course.code,
+        ...evaluation.unmetPrerequisites.flatMap(
+          (requirement) => requirement.codes,
+        ),
+        ...evaluation.unmetCorequisites,
+      ]),
+    ];
+
+    warnings.push({
+      id: `requirements-${course.id}`,
+      severity: "warning",
+      message: `${course.code} has unmet ${parts.join(" and ")}.`,
+      relatedCourseCodes: relatedCodes,
+      relatedCourseIds: [course.id],
+      relatedSemesterIds: [semesterId],
     });
   }
 

@@ -11,9 +11,15 @@ import {
   positionSemesterCourses,
 } from "../state/semesterLayout";
 import { downloadTextFile, getFileName } from "./common";
+import {
+  formatRequirementExpression,
+  parsePrerequisiteExpression,
+} from "../requirements/prerequisiteParser";
+import type { CourseRequirementCheck } from "../models/courseRequirement";
 
-const FORMAT_VERSION = "3";
-const PREVIOUS_FORMAT_VERSION = "2";
+const FORMAT_VERSION = "4";
+const PREVIOUS_FORMAT_VERSION = "3";
+const SECOND_PREVIOUS_FORMAT_VERSION = "2";
 const LEGACY_FORMAT_VERSION = "1";
 
 type CachedCourse = Course & {
@@ -124,7 +130,7 @@ function getSections(rows: string[][]): Map<string, string[][]> {
     if (row.every((cell) => cell.trim() === "")) continue;
 
     const sectionMatch =
-      row.length === 1 ? /^\[([a-z]+)\]$/i.exec(row[0].trim()) : null;
+      row.length === 1 ? /^\[([a-z_]+)\]$/i.exec(row[0].trim()) : null;
 
     if (sectionMatch) {
       currentSection = sectionMatch[1].toLowerCase();
@@ -224,6 +230,51 @@ export function serializePlanFile(plan: StudyPlan): string {
       ]),
     ),
     "",
+    "[requirement_checks]",
+    csvRow(["code", "status", "term", "checked_at", "nrc", "part_of_term"]),
+    ...[...coursesByCode.values()]
+      .filter((course) => course.requirements)
+      .map((course) =>
+        csvRow([
+          course.code,
+          course.requirements!.status,
+          course.requirements!.term,
+          course.requirements!.checkedAt,
+          course.requirements!.nrc ?? "",
+          course.requirements!.partOfTerm ?? "",
+        ]),
+      ),
+    "",
+    "[prerequisites]",
+    csvRow([
+      "code",
+      "rule_index",
+      "code_expression",
+      "description_expression",
+      "normalized_expression",
+    ]),
+    ...[...coursesByCode.values()].flatMap((course) =>
+      (course.requirements?.prerequisites ?? []).map((rule, index) =>
+        csvRow([
+          course.code,
+          index,
+          rule.codeExpression,
+          rule.descriptionExpression,
+          rule.expression
+            ? formatRequirementExpression(rule.expression)
+            : "",
+        ]),
+      ),
+    ),
+    "",
+    "[corequisites]",
+    csvRow(["code", "required_code", "title"]),
+    ...[...coursesByCode.values()].flatMap((course) =>
+      (course.requirements?.corequisites ?? []).map((corequisite) =>
+        csvRow([course.code, corequisite.code, corequisite.title]),
+      ),
+    ),
+    "",
     "[semesters]",
     csvRow(["semester", "term", ...slotHeaders]),
   ];
@@ -259,6 +310,7 @@ export function parsePlanFile(text: string): ParsedPlanFile {
   if (
     formatVersion !== FORMAT_VERSION &&
     formatVersion !== PREVIOUS_FORMAT_VERSION &&
+    formatVersion !== SECOND_PREVIOUS_FORMAT_VERSION &&
     formatVersion !== LEGACY_FORMAT_VERSION
   ) {
     throw new PlanFileError("Unsupported or missing plan format version.");
@@ -334,7 +386,8 @@ export function parsePlanFile(text: string): ParsedPlanFile {
 
   if (
     formatVersion === FORMAT_VERSION ||
-    formatVersion === PREVIOUS_FORMAT_VERSION
+    formatVersion === PREVIOUS_FORMAT_VERSION ||
+    formatVersion === SECOND_PREVIOUS_FORMAT_VERSION
   ) {
     if (!courseRows) {
       throw new PlanFileError("Missing required [courses] section.");
@@ -411,6 +464,71 @@ export function parsePlanFile(text: string): ParsedPlanFile {
           : {}),
         ...(fallbackText === "true" ? { metadataFallback: true } : {}),
       });
+    }
+  }
+
+  if (formatVersion === FORMAT_VERSION) {
+    const checkRows = requireSection(sections, "requirement_checks");
+    const prerequisiteRows = requireSection(sections, "prerequisites");
+    const corequisiteRows = requireSection(sections, "corequisites");
+    if (
+      checkRows[0]?.map((cell) => cell.trim()).join(",") !==
+        "code,status,term,checked_at,nrc,part_of_term" ||
+      prerequisiteRows[0]?.map((cell) => cell.trim()).join(",") !==
+        "code,rule_index,code_expression,description_expression,normalized_expression" ||
+      corequisiteRows[0]?.map((cell) => cell.trim()).join(",") !==
+        "code,required_code,title"
+    ) {
+      throw new PlanFileError("The requirement metadata headers are invalid.");
+    }
+
+    const requirementsByCode = new Map<string, CourseRequirementCheck>();
+    for (const row of checkRows.slice(1)) {
+      const code = normalizeCode(row[0] ?? "");
+      const status = row[1]?.trim();
+      if (
+        !code ||
+        !["loaded", "not-offered"].includes(status) ||
+        row[2]?.trim() !== "202620" ||
+        !row[3]?.trim()
+      ) {
+        throw new PlanFileError("A requirement check row is invalid.");
+      }
+      requirementsByCode.set(code, {
+        status: status as CourseRequirementCheck["status"],
+        term: "202620",
+        checkedAt: row[3].trim(),
+        nrc: row[4]?.trim() || undefined,
+        partOfTerm: row[5]?.trim() || undefined,
+        prerequisites: [],
+        corequisites: [],
+      });
+    }
+    for (const row of prerequisiteRows.slice(1)) {
+      const check = requirementsByCode.get(normalizeCode(row[0] ?? ""));
+      if (!check) continue;
+      const normalized = row[4]?.trim();
+      check.prerequisites.push({
+        codeExpression: row[2] ?? "",
+        descriptionExpression: row[3] ?? "",
+        expression: normalized
+          ? parsePrerequisiteExpression(normalized) ?? undefined
+          : undefined,
+      });
+    }
+    for (const row of corequisiteRows.slice(1)) {
+      const check = requirementsByCode.get(normalizeCode(row[0] ?? ""));
+      const requiredCode = normalizeCode(row[1] ?? "");
+      if (check && requiredCode) {
+        check.corequisites.push({
+          code: requiredCode,
+          title: row[2]?.trim() ?? "",
+        });
+      }
+    }
+    for (const course of cachedCourses) {
+      const requirements = requirementsByCode.get(course.code);
+      if (requirements) course.requirements = requirements;
     }
   }
 

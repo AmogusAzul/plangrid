@@ -3,6 +3,6 @@ export type PlanWarning = {
   severity: "info" | "warning" | "error";
   message: string;
   relatedCourseCodes?: string[];
+  relatedCourseIds?: string[];
   relatedSemesterIds?: string[];
 };
-

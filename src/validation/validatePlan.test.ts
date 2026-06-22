@@ -147,4 +147,38 @@ describe("validatePlan", () => {
       ]),
     );
   });
+
+  it("emits one combined warning for an affected planned course instance", () => {
+    const plan = createBlankPlan(2);
+    plan.semesters[1].courses.push({
+      id: "target",
+      code: "FISI-1518",
+      name: "Fisica I",
+      credits: 3,
+      requirements: {
+        status: "loaded",
+        term: "202620",
+        checkedAt: "2026-06-22T00:00:00.000Z",
+        prerequisites: [
+          {
+            codeExpression: "MATE 1203",
+            descriptionExpression: "Calculo",
+            expression: { type: "course", code: "MATE-1203" },
+          },
+        ],
+        corequisites: [{ code: "FISI-1518P", title: "Laboratorio" }],
+      },
+    });
+
+    expect(validatePlan(plan)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "requirements-target",
+          relatedCourseIds: ["target"],
+          relatedSemesterIds: [plan.semesters[1].id],
+          message: expect.stringContaining("MATE-1203"),
+        }),
+      ]),
+    );
+  });
 });
