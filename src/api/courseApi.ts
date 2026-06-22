@@ -9,6 +9,9 @@ export type RawCourseOffering = {
   course?: unknown;
   credits?: unknown;
   title?: unknown;
+  nrc?: unknown;
+  term?: unknown;
+  ptrm?: unknown;
 };
 
 type FetchCourseApi = (
@@ -88,7 +91,7 @@ function formatNameQuery(query: string): string {
   return query.trim().replace(/\s+/g, "%25");
 }
 
-function createSearchUrl(input: string, offset = 0): URL {
+export function createSearchUrl(input: string, offset = 0): URL {
   const { prefix, query } = parseCourseSearchInput(input);
   const url = new URL(COURSE_API_URL);
   const parameters: Record<string, string> = {
@@ -114,6 +117,46 @@ function createSearchUrl(input: string, offset = 0): URL {
   }
 
   return url;
+}
+
+export async function findExactCourseOfferings(
+  code: string,
+  fetchApi: FetchCourseApi = fetch,
+): Promise<RawCourseOffering[]> {
+  const parsed = parseCourseSearchInput(code);
+  if (!parsed.prefix) return [];
+
+  const url = createSearchUrl(`${parsed.prefix}-${parsed.query}`);
+  url.searchParams.set("term", "202620");
+  const response = await fetchApi(url, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new CourseApiError(
+      `The Uniandes course service returned status ${response.status}.`,
+    );
+  }
+
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload)) {
+    throw new CourseApiError(
+      "The Uniandes course service returned an unexpected response.",
+    );
+  }
+
+  return payload
+    .filter(
+      (row) =>
+        typeof row?.class === "string" &&
+        typeof row.course === "string" &&
+        `${row.class.trim().toUpperCase()}-${row.course.trim().toUpperCase()}` ===
+          `${parsed.prefix}-${parsed.query}`,
+    )
+    .sort((left, right) => {
+      const leftFull = left.ptrm === "1" ? 0 : 1;
+      const rightFull = right.ptrm === "1" ? 0 : 1;
+      return leftFull - rightFull;
+    });
 }
 
 async function fetchCoursePage(

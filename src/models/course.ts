@@ -1,5 +1,6 @@
 import type { CatalogCourseSummary } from "./catalogCourse";
 import type { SearchResultAvailability } from "./searchResult";
+import type { CourseRequirementCheck } from "./courseRequirement";
 
 export type CourseMetadataSource =
   | "api"
@@ -17,6 +18,7 @@ export type Course = {
   availability?: SearchResultAvailability;
   catalog?: CatalogCourseSummary;
   metadataFallback?: boolean;
+  requirements?: CourseRequirementCheck;
 };
 
 export type PlannedCourse = Course & {

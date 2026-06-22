@@ -75,3 +75,8 @@ export async function getCatalogCourseSummaries(
 
   return summaries;
 }
+
+export async function loadCatalogCourseCodes(): Promise<Set<string>> {
+  const coursesByCode = await getCoursesByCode();
+  return new Set(coursesByCode.keys());
+}
