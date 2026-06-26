@@ -3,10 +3,16 @@ import type { CourseSearchState } from "../models/courseSearch";
 import type { SearchAppearanceSettings } from "../models/searchAppearance";
 import type { CourseSearchResult, SearchFilters } from "../models/searchResult";
 import type { StudyPlan } from "../models/studyPlan";
+import { getLanguageText } from "../config/languageText";
 import { mockCourses } from "../presets/mockCourses";
 import { planPresets } from "../presets/planPresets";
 import { STORAGE_DESTINATION } from "../state/courseDestination";
-import { addCourse, deleteCourse, moveCourse } from "../state/planCourses";
+import {
+  addCourse,
+  deleteCourse,
+  moveCourse,
+  toggleCourseCoursed,
+} from "../state/planCourses";
 import {
   isRegularTerm,
   resizeSemesters,
@@ -23,7 +29,11 @@ import {
   sumCredits,
   validatePlan,
 } from "../validation/validatePlan";
-import { getCourseColor, getCoursePalette } from "./courseColor";
+import {
+  colorOverrideSchemes,
+  getCourseColor,
+  getCoursePalette,
+} from "./courseColor";
 import {
   COURSE_DRAG_TYPE,
   getGrabOffsetRatio,
@@ -41,6 +51,11 @@ import {
   recognizedRequirementDefinitions,
   type RecognizedRequirementId,
 } from "../models/recognizedRequirement";
+import {
+  appLanguages,
+  type AppLanguage,
+  type LanguageSettings,
+} from "../state/languageSettings";
 
 type AppActions = {
   updatePlan: (update: (plan: StudyPlan) => StudyPlan) => void;
@@ -51,6 +66,8 @@ type AppActions = {
   loadPreset: (presetId: string) => Promise<string[]>;
   updateSearchFilters: (filters: SearchFilters) => void;
   updateSearchAppearance: (settings: SearchAppearanceSettings) => void;
+  updateLanguage: (language: AppLanguage) => void;
+  dismissLanguagePrompt: () => void;
   showCourseDetails: (course: Course) => void;
   closeCourseDetails: () => void;
   search: (query: string, mode?: "fast" | "catalog") => Promise<void>;
@@ -72,9 +89,10 @@ export function courseCard(
   affectedCourseCodes: Set<string>,
   affectedCourseIds: Set<string>,
   useMutedCatalogOnlyCards: boolean,
+  enabledColorOverrideSchemeIds: string[] = [],
   position?: PositionedCourse,
 ): string {
-  const palette = getCoursePalette(course);
+  const palette = getCoursePalette(course, enabledColorOverrideSchemeIds);
   const warningBadge =
     affectedCourseCodes.has(course.code) || affectedCourseIds.has(course.id)
     ? '<span class="course-card__warning" role="img" aria-label="Course warning" title="Course warning">!</span>'
@@ -88,9 +106,10 @@ export function courseCard(
       style="--course-span: ${position?.span ?? Math.max(1, course.credits)}; --course-column: ${position?.column ?? 1}; --course-color: ${palette.background}"
       data-course-id="${escapeHtml(course.id)}"
       data-source="${escapeHtml(source)}"
+      data-coursed="${course.coursed ? "true" : "false"}"
       data-muted-catalog-only="${isCatalogOnly && useMutedCatalogOnlyCards ? "true" : "false"}"
       draggable="true"
-      title="${escapeHtml(`${course.code}\n${course.name}\n${course.credits} credits`)}"
+      title="${escapeHtml(`${course.code}\n${course.name}\n${course.credits} credits\nRight-click to toggle coursed`)}"
     >
       ${warningBadge}
       <strong>${escapeHtml(course.code)}</strong>
@@ -218,7 +237,10 @@ function availabilityText(course: Course): string {
   return "Current";
 }
 
-function catalogCourseItem(course: CourseSearchResult): string {
+function catalogCourseItem(
+  course: CourseSearchResult,
+  enabledColorOverrideSchemeIds: string[],
+): string {
   const snippet = course.matchedSnippet || course.catalog?.matchedSnippet;
   return `
     <li
@@ -227,7 +249,7 @@ function catalogCourseItem(course: CourseSearchResult): string {
       draggable="true"
       title="Drag into a semester or storage"
     >
-      <span class="catalog-course__swatch" style="--course-color: ${getCourseColor(course)}"></span>
+      <span class="catalog-course__swatch" style="--course-color: ${getCourseColor(course, enabledColorOverrideSchemeIds)}"></span>
       <div>
         <strong>${escapeHtml(course.code)}</strong>
         <span>${escapeHtml(course.name)}</span>
@@ -239,12 +261,18 @@ function catalogCourseItem(course: CourseSearchResult): string {
   `;
 }
 
-function searchContent(search: CourseSearchState): string {
+function searchContent(
+  search: CourseSearchState,
+  enabledColorOverrideSchemeIds: string[],
+  language: AppLanguage,
+): string {
+  const t = (key: Parameters<typeof getLanguageText>[1]) =>
+    getLanguageText(language, key);
   if (search.status === "loading") {
-    return '<p class="search-status">Searching the Uniandes course catalog...</p>';
+    return `<p class="search-status">${t("searching")} the Uniandes course catalog...</p>`;
   }
   if (search.status === "catalog-loading") {
-    return '<p class="search-status">Searching catalog descriptions across departments...</p>';
+    return `<p class="search-status">${t("searching")} catalog descriptions across departments...</p>`;
   }
 
   if (search.status === "error") {
@@ -261,7 +289,7 @@ function searchContent(search: CourseSearchState): string {
             source: "api",
             metadataSource: "api",
             availability: "api-available",
-          }),
+          }, enabledColorOverrideSchemeIds),
         ).join("")}
       </ul>
     `;
@@ -287,15 +315,20 @@ function searchContent(search: CourseSearchState): string {
           : ""
       }
       <ul class="catalog-list">
-        ${search.results.map(catalogCourseItem).join("")}
+        ${search.results.map((course) =>
+          catalogCourseItem(course, enabledColorOverrideSchemeIds),
+        ).join("")}
       </ul>
     `;
   }
 
-  return '<p class="search-status">Search by code, name, or requirement such as CBU, CLE, EC, EING, or EP.</p>';
+  return `<p class="search-status">${t("courseQuery")} such as CBU, CLE, EC, EING, or EP.</p>`;
 }
 
-function departmentFilterOptions(search: CourseSearchState): string {
+function departmentFilterOptions(
+  search: CourseSearchState,
+  language: AppLanguage,
+): string {
   const departments: Array<{ code: string; name?: string }> =
     search.departmentOptions.length > 0
       ? search.departmentOptions
@@ -308,7 +341,7 @@ function departmentFilterOptions(search: CourseSearchState): string {
         ].sort().map((code) => ({ code }));
 
   return [
-    `<option value="all" ${search.filters.department === "all" ? "selected" : ""}>All departments</option>`,
+    `<option value="all" ${search.filters.department === "all" ? "selected" : ""}>${escapeHtml(getLanguageText(language, "allDepartments"))}</option>`,
     ...departments.map(
       (department) =>
         `<option value="${escapeHtml(department.code)}" ${search.filters.department === department.code ? "selected" : ""}>${escapeHtml(department.name ? `${department.code} - ${department.name}` : department.code)}</option>`,
@@ -328,10 +361,14 @@ export function renderApp(
   plan: StudyPlan,
   search: CourseSearchState,
   searchAppearance: SearchAppearanceSettings,
+  languageSettings: LanguageSettings,
   selectedDetailsCourse: Course | null,
   actions: AppActions,
 ): void {
   const scrollPosition = captureAppScroll(root);
+  const language = languageSettings.language;
+  const t = (key: Parameters<typeof getLanguageText>[1]) =>
+    getLanguageText(language, key);
   const warnings = validatePlan(plan);
   const affectedCourseCodes = new Set(
     warnings
@@ -362,18 +399,34 @@ export function renderApp(
           class="help-button"
           id="open-help"
           type="button"
-          aria-label="What is PlanGrid and how is it used?"
-          title="About PlanGrid"
+          aria-label="${escapeHtml(t("helpAria"))}"
+          title="${escapeHtml(t("aboutTitle"))}"
         >?</button>
         <div class="header-actions">
-          <span class="save-status">Autosaved locally</span>
-          <button class="button button--ghost" id="export-png">Export PNG</button>
-          <button class="button button--ghost" id="export-plan">Export Plan</button>
-          <button class="button button--ghost" id="import-plan">Import Plan</button>
+          <span class="save-status">${escapeHtml(t("autosaved"))}</span>
+          <button class="button button--ghost" id="export-png">${escapeHtml(t("exportPng"))}</button>
+          <button class="button button--ghost" id="export-plan">${escapeHtml(t("exportPlan"))}</button>
+          <button class="button button--ghost" id="import-plan">${escapeHtml(t("importPlan"))}</button>
           <input id="import-plan-file" type="file" accept=".plan,text/csv" hidden />
-          <button class="button button--ghost button--danger" id="reset-plan">Reset</button>
+          <button class="button button--ghost button--danger" id="reset-plan">${escapeHtml(t("reset"))}</button>
         </div>
       </header>
+
+      ${
+        languageSettings.hasSeenLanguagePrompt
+          ? ""
+          : `<div class="language-modal" role="dialog" aria-modal="true" aria-labelledby="language-title">
+              <div class="language-modal__panel">
+                <span class="eyebrow">${escapeHtml(t("languagePromptEyebrow"))}</span>
+                <h2 id="language-title">${escapeHtml(t("languagePromptTitle"))}</h2>
+                <p>${escapeHtml(t("languagePromptBody"))}</p>
+                <div class="language-modal__actions">
+                  <button class="button" type="button" data-language-choice="en">${escapeHtml(t("continueEnglish"))}</button>
+                  <button class="button button--primary" type="button" data-language-choice="es">${escapeHtml(t("switchSpanish"))}</button>
+                </div>
+              </div>
+            </div>`
+      }
 
       <dialog class="help-dialog" id="help-dialog" aria-labelledby="help-title">
         <div class="help-dialog__header">
@@ -473,8 +526,8 @@ export function renderApp(
         <section class="panel warnings-panel" aria-live="polite">
           <div class="panel__heading">
             <div>
-              <span class="eyebrow">Plan health</span>
-              <h2>Warnings</h2>
+              <span class="eyebrow">${escapeHtml(t("planHealth"))}</span>
+              <h2>${escapeHtml(t("warnings"))}</h2>
             </div>
             <span class="count-badge">${warnings.length}</span>
           </div>
@@ -486,15 +539,15 @@ export function renderApp(
                       `<li data-warning-id="${escapeHtml(warning.id)}"><span aria-hidden="true">!</span><p>${escapeHtml(warning.message)}</p></li>`,
                   )
                   .join("")}</ul>`
-              : '<p class="empty-state empty-state--success">No plan warnings.</p>'
+              : `<p class="empty-state empty-state--success">${escapeHtml(t("noWarnings"))}</p>`
           }
         </section>
 
         <section class="panel storage-panel">
           <div class="panel__heading">
             <div>
-              <span class="eyebrow">Unplaced</span>
-              <h2>Storage</h2>
+              <span class="eyebrow">${escapeHtml(t("unplaced"))}</span>
+              <h2>${escapeHtml(t("storage"))}</h2>
             </div>
             <span class="count-badge">${plan.storage.length}</span>
           </div>
@@ -512,10 +565,11 @@ export function renderApp(
                         affectedCourseCodes,
                         affectedCourseIds,
                         searchAppearance.useMutedCatalogOnlyCards,
+                        plan.colorOverrideSchemeIds,
                       ),
                     )
                     .join("")
-                : '<p class="empty-state">Drop unplaced courses here.</p>'
+                : `<p class="empty-state">${escapeHtml(t("storageEmpty"))}</p>`
             }
           </div>
         </section>
@@ -523,64 +577,64 @@ export function renderApp(
         <section class="panel course-search-panel">
           <div class="panel__heading">
             <div>
-              <span class="eyebrow">Uniandes catalog</span>
-              <h2>Add courses</h2>
+              <span class="eyebrow">${escapeHtml(t("catalogEyebrow"))}</span>
+              <h2>${escapeHtml(t("addCourses"))}</h2>
             </div>
             <details class="search-options-menu">
               <summary aria-label="Catalog search options" title="Catalog search options">...</summary>
               <div class="search-options-menu__panel">
                 <label>
-                  <span>Source</span>
+                  <span>${escapeHtml(t("source"))}</span>
                   <select id="source-filter">
-                    <option value="all" ${search.filters.source === "all" ? "selected" : ""}>All sources</option>
-                    <option value="api-available" ${search.filters.source === "api-available" ? "selected" : ""}>Current API</option>
-                    <option value="catalog-only" ${search.filters.source === "catalog-only" ? "selected" : ""}>Catalog only</option>
-                    <option value="unknown" ${search.filters.source === "unknown" ? "selected" : ""}>Unverified</option>
+                    <option value="all" ${search.filters.source === "all" ? "selected" : ""}>${escapeHtml(t("allSources"))}</option>
+                    <option value="api-available" ${search.filters.source === "api-available" ? "selected" : ""}>${escapeHtml(t("currentApi"))}</option>
+                    <option value="catalog-only" ${search.filters.source === "catalog-only" ? "selected" : ""}>${escapeHtml(t("catalogOnly"))}</option>
+                    <option value="unknown" ${search.filters.source === "unknown" ? "selected" : ""}>${escapeHtml(t("unverified"))}</option>
                   </select>
                 </label>
                 <label class="catalog-appearance-toggle">
                   <input id="muted-catalog-only" type="checkbox" ${searchAppearance.useMutedCatalogOnlyCards ? "checked" : ""} />
-                  <span>Muted catalog-only cards</span>
+                  <span>${escapeHtml(t("mutedCatalogOnly"))}</span>
                 </label>
               </div>
             </details>
           </div>
           <form class="course-search" id="course-search-form">
-            <label for="course-query">Course code, name, or requirement</label>
+            <label for="course-query">${escapeHtml(t("courseQuery"))}</label>
             <div>
               <input
                 id="course-query"
                 name="query"
                 type="search"
                 value="${escapeHtml(search.query)}"
-                placeholder="ISIS-1225, estructuras, or EP"
+                placeholder="${escapeHtml(t("searchPlaceholder"))}"
                 autocomplete="off"
                 required
               />
               <button type="submit" ${search.status === "loading" ? "disabled" : ""}>
-                ${search.status === "loading" ? "Searching" : "Search"}
+                ${search.status === "loading" ? escapeHtml(t("searching")) : escapeHtml(t("search"))}
               </button>
             </div>
           </form>
           <div class="search-filters">
             <label>
-              <span>Department</span>
+              <span>${escapeHtml(t("department"))}</span>
               <select id="department-filter">
-                ${departmentFilterOptions(search)}
+                ${departmentFilterOptions(search, language)}
               </select>
             </label>
           </div>
-          <p class="drag-hint">Drag any result directly into a semester or storage.</p>
+          <p class="drag-hint">${escapeHtml(t("dragHint"))}</p>
           <div class="search-results" aria-live="polite">
-            ${searchContent(search)}
+            ${searchContent(search, plan.colorOverrideSchemeIds, language)}
           </div>
         </section>
 
         <section class="panel presets-panel">
           <div class="panel__heading">
             <div>
-              <span class="eyebrow">Starting points</span>
-              <h2>Presets</h2>
+              <span class="eyebrow">${escapeHtml(t("startingPoints"))}</span>
+              <h2>${escapeHtml(t("presets"))}</h2>
             </div>
             <span class="count-badge">${planPresets.length}</span>
           </div>
@@ -593,7 +647,7 @@ export function renderApp(
                       <strong>${escapeHtml(preset.name)}</strong>
                       <p>${escapeHtml(preset.description)}</p>
                     </div>
-                    <button data-load-preset="${escapeHtml(preset.id)}">Use preset</button>
+                    <button data-load-preset="${escapeHtml(preset.id)}">${escapeHtml(t("usePreset"))}</button>
                   </article>
                 `,
               )
@@ -607,7 +661,7 @@ export function renderApp(
         <section class="planner-toolbar">
           <div class="roadmap-heading">
             <label class="roadmap-title" for="plan-name">
-              <span class="eyebrow">Academic roadmap</span>
+              <span class="eyebrow">${escapeHtml(t("academicRoadmap"))}</span>
               <input
                 id="plan-name"
                 value="${escapeHtml(plan.name)}"
@@ -616,9 +670,9 @@ export function renderApp(
               />
             </label>
             <details class="plan-options-menu">
-              <summary aria-label="Plan options" title="Plan options">...</summary>
+              <summary aria-label="${escapeHtml(t("planOptions"))}" title="${escapeHtml(t("planOptions"))}">...</summary>
               <div class="plan-options-menu__panel">
-                <span class="eyebrow">Recognized requirements</span>
+                <span class="eyebrow">${escapeHtml(t("recognizedRequirements"))}</span>
                 ${recognizedRequirementDefinitions
                   .map(
                     (definition) => `
@@ -636,20 +690,57 @@ export function renderApp(
                     `,
                   )
                   .join("")}
+                <span class="eyebrow">${escapeHtml(t("colorOverrides"))}</span>
+                ${colorOverrideSchemes
+                  .map(
+                    (scheme) => `
+                      <label class="recognized-requirement-option">
+                        <input
+                          type="checkbox"
+                          data-color-override-scheme="${escapeHtml(scheme.id)}"
+                          ${plan.colorOverrideSchemeIds.includes(scheme.id) ? "checked" : ""}
+                        />
+                        <span>
+                          <strong>${escapeHtml(scheme.name)}</strong>
+                          <small>${escapeHtml(scheme.id)}</small>
+                        </span>
+                      </label>
+                    `,
+                  )
+                  .join("")}
+                <span class="eyebrow">${escapeHtml(t("language"))}</span>
+                ${appLanguages
+                  .map(
+                    (option) => `
+                      <label class="recognized-requirement-option">
+                        <input
+                          type="radio"
+                          name="app-language"
+                          data-app-language="${option.id}"
+                          ${language === option.id ? "checked" : ""}
+                        />
+                        <span>
+                          <strong>${escapeHtml(option.nativeLabel)}</strong>
+                          <small>${escapeHtml(option.label)}</small>
+                        </span>
+                      </label>
+                    `,
+                  )
+                  .join("")}
               </div>
             </details>
           </div>
           <div class="plan-stats">
             <div class="plan-total-card">
               <strong>${getTotalPlanCredits(plan)}</strong>
-              <span>Total plan credits</span>
+              <span>${escapeHtml(t("totalPlanCredits"))}</span>
             </div>
             <label>
-              <span>Semesters</span>
+              <span>${escapeHtml(t("semesters"))}</span>
               <input id="semester-count" type="number" min="1" max="16" value="${plan.semesters.length}" />
             </label>
             <label>
-              <span>Credit limit</span>
+              <span>${escapeHtml(t("creditLimit"))}</span>
               <input id="credit-limit" type="number" min="1" max="30" value="${plan.creditLimitPerSemester}" />
             </label>
           </div>
@@ -679,7 +770,7 @@ export function renderApp(
                 <article class="semester-row ${hasWarning ? "semester-row--warning" : ""}">
                   <header class="semester-meta">
                     <label class="semester-term-editor">
-                      ${semesterIndex === 0 ? "<span>Edit first period</span>" : ""}
+                      ${semesterIndex === 0 ? `<span>${escapeHtml(t("editFirstPeriod"))}</span>` : ""}
                       <input
                         data-semester-term="${escapeHtml(semester.id)}"
                         value="${escapeHtml(semester.termHint)}"
@@ -717,10 +808,11 @@ export function renderApp(
                                 affectedCourseCodes,
                                 affectedCourseIds,
                                 searchAppearance.useMutedCatalogOnlyCards,
+                                plan.colorOverrideSchemeIds,
                                 position,
                               ),
                             ).join("")
-                        : '<p class="semester-empty">Drop courses here</p>'
+                        : `<p class="semester-empty">${escapeHtml(t("dropCoursesHere"))}</p>`
                     }
                   </div>
                 </article>
@@ -730,7 +822,7 @@ export function renderApp(
         </section>
 
         <p class="disclaimer">
-          Unofficial planning tool. Confirm final plans with academic coordination or an advisor.
+          ${escapeHtml(t("disclaimer"))}
         </p>
       </main>
     </div>
@@ -777,6 +869,23 @@ export function renderApp(
         return {
           ...current,
           recognizedRequirementIds: [...selected],
+        };
+      });
+    });
+  });
+
+  root.querySelectorAll<HTMLInputElement>("[data-color-override-scheme]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const id = input.dataset.colorOverrideScheme;
+      if (!id) return;
+
+      actions.updatePlan((current) => {
+        const selected = new Set(current.colorOverrideSchemeIds);
+        if (input.checked) selected.add(id);
+        else selected.delete(id);
+        return {
+          ...current,
+          colorOverrideSchemeIds: [...selected],
         };
       });
     });
@@ -845,6 +954,27 @@ export function renderApp(
     const input = event.currentTarget as HTMLInputElement;
     actions.updateSearchAppearance({
       useMutedCatalogOnlyCards: input.checked,
+    });
+  });
+
+  root.querySelectorAll<HTMLButtonElement>("[data-language-choice]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const languageChoice = button.dataset.languageChoice as AppLanguage | undefined;
+      if (languageChoice === "en" || languageChoice === "es") {
+        actions.updateLanguage(languageChoice);
+      } else {
+        actions.dismissLanguagePrompt();
+      }
+    });
+  });
+
+  root.querySelectorAll<HTMLInputElement>("[data-app-language]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const languageChoice = input.dataset.appLanguage as AppLanguage | undefined;
+      if (!input.checked) return;
+      if (languageChoice === "en" || languageChoice === "es") {
+        actions.updateLanguage(languageChoice);
+      }
     });
   });
 
@@ -1001,6 +1131,12 @@ export function renderApp(
   }
 
   root.querySelectorAll<HTMLElement>("[data-course-id]").forEach((card) => {
+    card.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      const courseId = card.dataset.courseId;
+      if (!courseId) return;
+      actions.updatePlan((current) => toggleCourseCoursed(current, courseId));
+    });
     card.addEventListener("dragstart", (event) => {
       const courseId = card.dataset.courseId;
       if (!courseId) return;

@@ -16,27 +16,42 @@ describe("getCoursePalette", () => {
     );
   });
 
-  it("keeps seeded lightness within the white-text range", () => {
-    const lightnessValues = Array.from({ length: 500 }, (_, index) => {
-      const palette = getCoursePalette(course(`ISIS-${1000 + index}`));
-      const match = / (\d+)%\)$/.exec(palette.background);
-      return Number(match?.[1]);
-    });
-
-    expect(Math.min(...lightnessValues)).toBeGreaterThanOrEqual(22);
-    expect(Math.max(...lightnessValues)).toBeLessThanOrEqual(48);
-    expect(new Set(lightnessValues).size).toBeGreaterThan(20);
+  it("maps the first course-code digit to descending lightness brackets", () => {
+    expect(getCoursePalette(course("ISIS-1221")).background).toMatch(/ 48%\)$/);
+    expect(getCoursePalette(course("ISIS-2221")).background).toMatch(/ 40%\)$/);
+    expect(getCoursePalette(course("ISIS-3221")).background).toMatch(/ 32%\)$/);
+    expect(getCoursePalette(course("ISIS-4221")).background).toMatch(/ 24%\)$/);
   });
 
-  it("decorrelates neighboring course numbers with a seeded PRNG", () => {
-    const lightnessValues = [
-      "ISIS-1221",
-      "ISIS-1222",
-      "ISIS-1223",
-      "ISIS-1224",
-      "ISIS-1225",
-    ].map((code) => getCoursePalette(course(code)).background.match(/ (\d+)%\)$/)?.[1]);
+  it("uses the enabled ISIS plan course override while keeping level lightness", () => {
+    expect(getCoursePalette(course("ISIS-1611")).background).toBe(
+      "hsl(260 86% 48%)",
+    );
+  });
 
-    expect(new Set(lightnessValues).size).toBeGreaterThan(3);
+  it("can disable the ISIS plan course override", () => {
+    expect(getCoursePalette(course("ISIS-1611"), []).background).not.toBe(
+      "hsl(260 86% 48%)",
+    );
+  });
+
+  it("uses the enabled Friendly MATE department override", () => {
+    const matePalette = getCoursePalette(course("MATE-1203"));
+
+    expect(matePalette.background).not.toBe(
+      getCoursePalette({
+        code: "PLAN-1203",
+        name: "PLAN-1203",
+        credits: 3,
+        department: "PLAN",
+      }).background,
+    );
+    expect(matePalette.background).toMatch(/^hsl\(\d+ \d+% 48%\)$/);
+  });
+
+  it("can disable the Friendly MATE department override", () => {
+    expect(getCoursePalette(course("MATE-1203"), []).background).not.toEqual(
+      getCoursePalette(course("MATE-1203")).background,
+    );
   });
 });

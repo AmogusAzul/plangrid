@@ -17,4 +17,5 @@ export type StudyPlan = {
   semesters: PlanSemester[];
   storage: PlannedCourse[];
   recognizedRequirementIds: RecognizedRequirementId[];
+  colorOverrideSchemeIds: string[];
 };

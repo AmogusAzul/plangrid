@@ -24,4 +24,5 @@ export type Course = {
 export type PlannedCourse = Course & {
   id: string;
   slotStart?: number;
+  coursed?: boolean;
 };

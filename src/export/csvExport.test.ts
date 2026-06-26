@@ -35,12 +35,14 @@ describe("plan file export", () => {
     const plan = createBlankPlan(2);
     plan.name = 'Plan, "Special"';
     plan.creditLimitPerSemester = 6;
+    plan.colorOverrideSchemeIds = ["friendly-mate"];
     plan.semesters[0].courses.push({
       id: "course-1",
       code: "ISIS-1221",
       name: "Programming",
       credits: 3,
       slotStart: 8,
+      coursed: true,
     });
     plan.storage.push({
       id: "course-2",
@@ -54,9 +56,13 @@ describe("plan file export", () => {
 
     expect(text).toContain('plan_name,"Plan, ""Special"""');
     expect(text).toContain("[courses]");
-    expect(text).toContain("format_version,5");
+    expect(text).toContain("format_version,7");
+    expect(text).toContain("[color_overrides]");
+    expect(text).toContain("friendly-mate");
     expect(text).toContain("metadata_source,availability");
     expect(text).toContain("ISIS-1221,Programming,3");
+    expect(text).toContain("ISIS-1221|coursed");
+    expect(text).toContain("course_code,coursed");
     expect(text).toContain("slot_10");
     expect(parsed.name).toBe('Plan, "Special"');
     expect(parsed.id).toBe(plan.id);
@@ -72,9 +78,12 @@ describe("plan file export", () => {
     );
     expect(parsed.semesters).toHaveLength(2);
     expect(parsed.semesters[0].courses).toEqual([
-      { code: "ISIS-1221", slotStart: 8 },
+      { code: "ISIS-1221", slotStart: 8, coursed: true },
     ]);
-    expect(parsed.storageCodes).toEqual(["MATE-1203"]);
+    expect(parsed.storageCourses).toEqual([
+      { code: "MATE-1203", coursed: false },
+    ]);
+    expect(parsed.colorOverrideSchemeIds).toEqual(["friendly-mate"]);
   });
 
   it("rejects unknown versions and malformed required sections", () => {
@@ -82,7 +91,7 @@ describe("plan file export", () => {
     const text = serializePlanFile(plan);
 
     expect(() =>
-      parsePlanFile(text.replace("format_version,5", "format_version,99")),
+      parsePlanFile(text.replace("format_version,7", "format_version,99")),
     ).toThrow(PlanFileError);
     expect(() =>
       parsePlanFile(text.replace("[storage]", "[backlog]")),
@@ -120,6 +129,7 @@ describe("plan file import", () => {
     plan.storage.push({
       id: "course-3",
       ...catalog.get("MATE-1203")!,
+      coursed: true,
     });
     const lookup = vi.fn(async (code: string) => catalog.get(code) ?? null);
 
@@ -138,6 +148,7 @@ describe("plan file import", () => {
       imported.plan.semesters[1].courses[0].id,
     );
     expect(imported.plan.storage[0].code).toBe("MATE-1203");
+    expect(imported.plan.storage[0].coursed).toBe(true);
   });
 
   it("uses cached metadata when fresh lookup fails", async () => {
@@ -199,9 +210,10 @@ describe("plan file import", () => {
     ).toBe(false);
   });
 
-  it("exports and imports catalog, requirement, and recognition metadata in format version 5", async () => {
+  it("exports and imports catalog, requirement, recognition, and color metadata in format version 7", async () => {
     const plan = createBlankPlan(1);
     plan.recognizedRequirementIds = ["homologated-precalculus"];
+    plan.colorOverrideSchemeIds = ["estudio-ingenieria-de-sistemas"];
     plan.semesters[0].courses.push({
       id: "catalog-only",
       code: "DERE-3001",
@@ -247,6 +259,7 @@ describe("plan file import", () => {
     expect(text).toContain("[prerequisites]");
     expect(text).toContain("[corequisites]");
     expect(text).toContain("[recognized_requirements]");
+    expect(text).toContain("[color_overrides]");
     expect(text).toContain("DERE-1001*");
     expect(imported.plan.semesters[0].courses[0]).toEqual(
       expect.objectContaining({
@@ -274,6 +287,9 @@ describe("plan file import", () => {
     );
     expect(imported.plan.recognizedRequirementIds).toEqual([
       "homologated-precalculus",
+    ]);
+    expect(imported.plan.colorOverrideSchemeIds).toEqual([
+      "estudio-ingenieria-de-sistemas",
     ]);
   });
 

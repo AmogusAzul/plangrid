@@ -9,6 +9,7 @@ import {
 import blankPresetData from "./blank-8-semesters.json";
 import isisPresetData from "./isis-2026-20-starter.json";
 import type { RecognizedRequirementId } from "../models/recognizedRequirement";
+import { defaultColorOverrideSchemeIds } from "../ui/courseColor";
 
 export type PlanPreset = {
   id: string;
@@ -133,6 +134,7 @@ export async function loadPlanPreset(
       })),
       storage: preset.storageCourseCodes.map(courseFor),
       recognizedRequirementIds: preset.recognizedRequirementIds ?? [],
+      colorOverrideSchemeIds: defaultColorOverrideSchemeIds,
     },
     fallbackCodes: hydrated.fallbackCodes,
   };

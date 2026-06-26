@@ -24,6 +24,13 @@ import {
   loadSearchAppearanceSettings,
   saveSearchAppearanceSettings,
 } from "./state/searchAppearance";
+import {
+  dismissLanguagePrompt,
+  loadLanguageSettings,
+  saveLanguageSettings,
+  updateLanguage,
+  type AppLanguage,
+} from "./state/languageSettings";
 import { loadCatalogDepartments } from "./catalog/catalogMetadata";
 import { enrichPlanWithCatalogDescriptions } from "./state/planCatalogDescriptions";
 import {
@@ -41,6 +48,7 @@ const appRoot = root;
 let plan = applyCachedRequirements(loadPlan());
 let courseSearch: CourseSearchState = initialCourseSearchState;
 let searchAppearance = loadSearchAppearanceSettings();
+let languageSettings = loadLanguageSettings();
 let selectedDetailsCourse: Course | null = null;
 let activeSearch = 0;
 let activePlanMetadataRefresh = 0;
@@ -87,7 +95,7 @@ function loadCachedCatalogDepartments(): void {
 }
 
 function render(): void {
-  renderApp(appRoot, plan, courseSearch, searchAppearance, selectedDetailsCourse, {
+  renderApp(appRoot, plan, courseSearch, searchAppearance, languageSettings, selectedDetailsCourse, {
     updatePlan(update) {
       plan = savePlan(update(plan));
       render();
@@ -133,6 +141,18 @@ function render(): void {
     },
     updateSearchAppearance(settings) {
       searchAppearance = saveSearchAppearanceSettings(settings);
+      render();
+    },
+    updateLanguage(language: AppLanguage) {
+      languageSettings = saveLanguageSettings(
+        updateLanguage(language),
+      );
+      render();
+    },
+    dismissLanguagePrompt() {
+      languageSettings = saveLanguageSettings(
+        dismissLanguagePrompt(languageSettings),
+      );
       render();
     },
     showCourseDetails(course) {

@@ -20,11 +20,17 @@ import {
   recognizedRequirementDefinitions,
   type RecognizedRequirementId,
 } from "../models/recognizedRequirement";
+import {
+  colorOverrideSchemes,
+  defaultColorOverrideSchemeIds,
+} from "../ui/courseColor";
 
-const FORMAT_VERSION = "5";
-const PREVIOUS_FORMAT_VERSION = "4";
-const SECOND_PREVIOUS_FORMAT_VERSION = "3";
-const THIRD_PREVIOUS_FORMAT_VERSION = "2";
+const FORMAT_VERSION = "7";
+const PREVIOUS_FORMAT_VERSION = "6";
+const SECOND_PREVIOUS_FORMAT_VERSION = "5";
+const THIRD_PREVIOUS_FORMAT_VERSION = "4";
+const FOURTH_PREVIOUS_FORMAT_VERSION = "3";
+const FIFTH_PREVIOUS_FORMAT_VERSION = "2";
 const LEGACY_FORMAT_VERSION = "1";
 
 type CachedCourse = Course & {
@@ -43,11 +49,16 @@ export type ParsedPlanFile = {
     courses: Array<{
       code: string;
       slotStart: number;
+      coursed: boolean;
     }>;
   }>;
-  storageCodes: string[];
+  storageCourses: Array<{
+    code: string;
+    coursed: boolean;
+  }>;
   cachedCourses: CachedCourse[];
   recognizedRequirementIds: RecognizedRequirementId[];
+  colorOverrideSchemeIds: string[];
 };
 
 export type ImportedPlan = {
@@ -75,6 +86,18 @@ function csvRow(values: Array<string | number>): string {
 
 function normalizeCode(value: string): string {
   return value.trim().toUpperCase();
+}
+
+function parseCourseCell(value: string): { code: string; coursed: boolean } {
+  const [code, ...flags] = value.split("|").map((part) => part.trim());
+  return {
+    code: normalizeCode(code ?? ""),
+    coursed: flags.map((flag) => flag.toLowerCase()).includes("coursed"),
+  };
+}
+
+function formatCourseCell(course: Pick<PlannedCourse, "code" | "coursed">): string {
+  return course.coursed ? `${course.code}|coursed` : course.code;
 }
 
 function parseCsvRows(text: string): string[][] {
@@ -206,6 +229,10 @@ export function serializePlanFile(plan: StudyPlan): string {
     csvRow(["id"]),
     ...plan.recognizedRequirementIds.map((id) => csvRow([id])),
     "",
+    "[color_overrides]",
+    csvRow(["scheme_id"]),
+    ...plan.colorOverrideSchemeIds.map((id) => csvRow([id])),
+    "",
     "[courses]",
     csvRow([
       "code",
@@ -293,7 +320,7 @@ export function serializePlanFile(plan: StudyPlan): string {
     const slots = Array.from({ length: slotCount }, () => "");
 
     for (const positioned of positionSemesterCourses(semester.courses)) {
-      slots[positioned.slotStart - 1] = positioned.course.code;
+      slots[positioned.slotStart - 1] = formatCourseCell(positioned.course);
     }
 
     lines.push(
@@ -301,8 +328,12 @@ export function serializePlanFile(plan: StudyPlan): string {
     );
   }
 
-  lines.push("", "[storage]", "course_code");
-  lines.push(...plan.storage.map((course) => csvRow([course.code])));
+  lines.push("", "[storage]", csvRow(["course_code", "coursed"]));
+  lines.push(
+    ...plan.storage.map((course) =>
+      csvRow([course.code, course.coursed ? "true" : "false"]),
+    ),
+  );
 
   return `${lines.join("\n")}\n`;
 }
@@ -322,6 +353,8 @@ export function parsePlanFile(text: string): ParsedPlanFile {
     formatVersion !== PREVIOUS_FORMAT_VERSION &&
     formatVersion !== SECOND_PREVIOUS_FORMAT_VERSION &&
     formatVersion !== THIRD_PREVIOUS_FORMAT_VERSION &&
+    formatVersion !== FOURTH_PREVIOUS_FORMAT_VERSION &&
+    formatVersion !== FIFTH_PREVIOUS_FORMAT_VERSION &&
     formatVersion !== LEGACY_FORMAT_VERSION
   ) {
     throw new PlanFileError("Unsupported or missing plan format version.");
@@ -371,8 +404,8 @@ export function parsePlanFile(text: string): ParsedPlanFile {
 
     const courses = row
       .slice(2, semesterHeader.length)
-      .map((code, index) => ({
-        code: normalizeCode(code),
+      .map((value, index) => ({
+        ...parseCourseCell(value),
         slotStart: index + 1,
       }))
       .filter((course) => course.code.length > 0);
@@ -388,10 +421,19 @@ export function parsePlanFile(text: string): ParsedPlanFile {
     throw new PlanFileError("The [storage] header is invalid.");
   }
 
-  const storageCodes = storageRows
+  const hasStorageCoursedColumn = storageRows[0]?.[1]?.trim() === "coursed";
+  const storageCourses = storageRows
     .slice(1)
-    .map((row) => normalizeCode(row[0] ?? ""))
-    .filter(Boolean);
+    .map((row) => {
+      const parsedCell = parseCourseCell(row[0] ?? "");
+      return {
+        code: parsedCell.code,
+        coursed: hasStorageCoursedColumn
+          ? row[1]?.trim().toLowerCase() === "true"
+          : parsedCell.coursed,
+      };
+    })
+    .filter((course) => course.code.length > 0);
   const courseRows = sections.get("courses");
   const cachedCourses: CachedCourse[] = [];
 
@@ -399,7 +441,9 @@ export function parsePlanFile(text: string): ParsedPlanFile {
     formatVersion === FORMAT_VERSION ||
     formatVersion === PREVIOUS_FORMAT_VERSION ||
     formatVersion === SECOND_PREVIOUS_FORMAT_VERSION ||
-    formatVersion === THIRD_PREVIOUS_FORMAT_VERSION
+    formatVersion === THIRD_PREVIOUS_FORMAT_VERSION ||
+    formatVersion === FOURTH_PREVIOUS_FORMAT_VERSION ||
+    formatVersion === FIFTH_PREVIOUS_FORMAT_VERSION
   ) {
     if (!courseRows) {
       throw new PlanFileError("Missing required [courses] section.");
@@ -481,7 +525,9 @@ export function parsePlanFile(text: string): ParsedPlanFile {
 
   if (
     formatVersion === FORMAT_VERSION ||
-    formatVersion === PREVIOUS_FORMAT_VERSION
+    formatVersion === PREVIOUS_FORMAT_VERSION ||
+    formatVersion === SECOND_PREVIOUS_FORMAT_VERSION ||
+    formatVersion === THIRD_PREVIOUS_FORMAT_VERSION
   ) {
     const checkRows = requireSection(sections, "requirement_checks");
     const prerequisiteRows = requireSection(sections, "prerequisites");
@@ -548,7 +594,11 @@ export function parsePlanFile(text: string): ParsedPlanFile {
   }
 
   const recognizedRequirementIds: RecognizedRequirementId[] = [];
-  if (formatVersion === FORMAT_VERSION) {
+  if (
+    formatVersion === FORMAT_VERSION ||
+    formatVersion === PREVIOUS_FORMAT_VERSION ||
+    formatVersion === SECOND_PREVIOUS_FORMAT_VERSION
+  ) {
     const recognizedRows = requireSection(sections, "recognized_requirements");
     if (recognizedRows[0]?.[0]?.trim() !== "id") {
       throw new PlanFileError(
@@ -567,6 +617,26 @@ export function parsePlanFile(text: string): ParsedPlanFile {
     }
   }
 
+  let colorOverrideSchemeIds = defaultColorOverrideSchemeIds;
+  if (formatVersion === FORMAT_VERSION) {
+    const colorOverrideRows = requireSection(sections, "color_overrides");
+    if (colorOverrideRows[0]?.[0]?.trim() !== "scheme_id") {
+      throw new PlanFileError("The [color_overrides] header is invalid.");
+    }
+    const validSchemeIds = new Set(
+      colorOverrideSchemes.map((scheme) => scheme.id),
+    );
+    colorOverrideSchemeIds = [];
+    for (const row of colorOverrideRows.slice(1)) {
+      const id = row[0]?.trim();
+      if (!id) continue;
+      if (!validSchemeIds.has(id)) {
+        throw new PlanFileError(`Unknown color override scheme: ${id}.`);
+      }
+      colorOverrideSchemeIds.push(id);
+    }
+  }
+
   return {
     id,
     name,
@@ -574,9 +644,10 @@ export function parsePlanFile(text: string): ParsedPlanFile {
     updatedAt,
     creditLimitPerSemester: creditLimit,
     semesters,
-    storageCodes,
+    storageCourses,
     cachedCourses,
     recognizedRequirementIds,
+    colorOverrideSchemeIds,
   };
 }
 
@@ -584,12 +655,14 @@ function plannedCourse(
   course: Course,
   metadataFallback: boolean,
   slotStart?: number,
+  coursed = false,
 ): PlannedCourse {
   return {
     ...course,
     id: createId(),
     ...(slotStart === undefined ? {} : { slotStart }),
     ...(metadataFallback ? { metadataFallback: true } : {}),
+    ...(coursed ? { coursed: true } : {}),
   };
 }
 
@@ -602,7 +675,7 @@ export async function importPlanFile(
     ...parsed.semesters.flatMap((semester) =>
       semester.courses.map((course) => course.code),
     ),
-    ...parsed.storageCodes,
+    ...parsed.storageCourses.map((course) => course.code),
   ];
   const uniqueCodes = [...new Set(codes)];
   const hydrated = await hydrateCourses(
@@ -632,21 +705,25 @@ export async function importPlanFile(
       id: createId(),
       label: semester.label,
       termHint: semester.termHint,
-      courses: semester.courses.map(({ code, slotStart }) =>
+      courses: semester.courses.map(({ code, slotStart, coursed }) =>
         plannedCourse(
           hydrated.courses.get(code)!,
           fallbackSet.has(code) || cachedFallbackSet.has(code),
           slotStart,
+          coursed,
         ),
       ),
     })),
-    storage: parsed.storageCodes.map((code) =>
+    storage: parsed.storageCourses.map(({ code, coursed }) =>
       plannedCourse(
         hydrated.courses.get(code)!,
         fallbackSet.has(code) || cachedFallbackSet.has(code),
+        undefined,
+        coursed,
       ),
     ),
     recognizedRequirementIds: parsed.recognizedRequirementIds,
+    colorOverrideSchemeIds: parsed.colorOverrideSchemeIds,
   };
 
   return {

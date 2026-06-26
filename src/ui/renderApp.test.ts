@@ -26,12 +26,30 @@ describe("course card actions", () => {
       expect(html).toContain(`aria-label="Open details for ${course.code}"`);
       expect(html).toContain(`aria-label="Remove ${course.code}"`);
       expect(html).toContain(
-        `title="${course.code}\n${course.name}\n${credits} credits"`,
+        `title="${course.code}\n${course.name}\n${credits} credits\nRight-click to toggle coursed"`,
       );
+      expect(html).toContain('data-coursed="false"');
       expect(html).not.toContain("data-store-course");
       expect(html).not.toContain(">Store<");
     });
   }
+
+  it("marks coursed cards for low-opacity styling", () => {
+    const html = courseCard(
+      {
+        id: "course-coursed",
+        code: "ISIS-1611",
+        name: "Coursed course",
+        credits: 3,
+        coursed: true,
+      },
+      new Set(),
+      new Set(),
+      true,
+    );
+
+    expect(html).toContain('data-coursed="true"');
+  });
 });
 
 describe("course requirement details", () => {

@@ -1,0 +1,20 @@
+{
+  "schemes": [
+    {
+      "id": "estudio-ingenieria-de-sistemas",
+      "name": "Estudio Ingenieria de Sistemas",
+      "enabled": true,
+      "courseOverrides": {
+        "ISIS-1611": "#6320ee"
+      }
+    },
+    {
+      "id": "friendly-mate",
+      "name": "Friendly MATE",
+      "enabled": true,
+      "departmentOverrides": {
+        "MATE": "#4f8f7a"
+      }
+    }
+  ]
+}

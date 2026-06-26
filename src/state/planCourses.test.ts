@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { PlannedCourse } from "../models/course";
 import { STORAGE_DESTINATION } from "./courseDestination";
 import { createBlankPlan } from "./planFactory";
-import { addCourse, deleteCourse, moveCourse } from "./planCourses";
+import {
+  addCourse,
+  deleteCourse,
+  moveCourse,
+  toggleCourseCoursed,
+} from "./planCourses";
 
 const course: PlannedCourse = {
   id: "course-1",
@@ -104,5 +109,19 @@ describe("planCourses", () => {
     plan.storage.push(course);
 
     expect(deleteCourse(plan, course.id).storage).toHaveLength(0);
+  });
+
+  it("toggles coursed state without moving the course", () => {
+    const plan = createBlankPlan(1);
+    plan.semesters[0].courses.push(course);
+
+    const marked = toggleCourseCoursed(plan, course.id);
+    const unmarked = toggleCourseCoursed(marked, course.id);
+
+    expect(marked.semesters[0].courses[0]).toEqual({
+      ...course,
+      coursed: true,
+    });
+    expect(unmarked.semesters[0].courses[0].coursed).toBe(false);
   });
 });

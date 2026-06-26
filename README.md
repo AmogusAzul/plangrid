@@ -21,6 +21,8 @@ inside the application. The brand itself links back to this repository.
 - Lazy catalog-description search across the Uniandes 2026 catalog
 - Catalog/API availability cues for the current 202620 offering API
 - Credit-sized cards with cell-snapped drag and drop
+- Right-click course cards to mark/unmark them as coursed without locking edits
+- Browser-level English/Spanish interface preference with a first-use prompt
 - Storage area for unplaced courses
 - Duplicate-course, fallback-metadata, unverified, and semester-overload warnings
 - Advisory prerequisite/corequisite checks based on current `202620` offering details
@@ -39,11 +41,18 @@ inside the application. The brand itself links back to this repository.
    to search the static 2026 catalog index.
 4. Edit the plan title, semester periods, semester count, and credit limit
    directly on the planner.
-5. Review warnings without losing the ability to move or add courses.
-6. Use **Export Plan** for an editable backup or **Export PNG** for sharing.
+5. Right-click any planned or stored course card to mark it as coursed. Coursed
+   cards render with lower opacity but can still be moved, inspected, exported,
+   or removed.
+6. Review warnings without losing the ability to move or add courses.
+7. Use **Export Plan** for an editable backup or **Export PNG** for sharing.
 
 Loading a preset or importing a `.plan` file replaces the current autosaved
 plan after confirmation.
+
+PlanGrid opens in English by default. On first use, it shows a language prompt
+that can switch the interface to Spanish. The language choice is saved in this
+browser and can be changed later from the plan options `...` menu.
 
 ## Plan Files
 
@@ -54,14 +63,16 @@ plan after confirmation.
 - `[requirement_checks]`, `[prerequisites]`, and `[corequisites]` store
   advisory requirement metadata.
 - `[recognized_requirements]` stores plan-level fulfilled requirement options.
+- `[color_overrides]` stores enabled color override scheme IDs.
 - `[semesters]` stores semester labels, terms, and course starting slots.
 - `[storage]` stores unplaced course codes.
 
 The file stores course codes, names, credits, departments, source/availability
 metadata, catalog summaries, plan timestamps, semester placement, and fallback
-status. Format version 5 preserves catalog-only courses, requirement checks,
-recognized requirements, and concurrent prerequisite `*` markers through
-readable metadata tables. During import, PlanGrid still requests current
+status. Format version 7 preserves catalog-only courses, requirement checks,
+recognized requirements, concurrent prerequisite `*` markers, and per-card
+coursed state through readable metadata tables. It also preserves which color
+override schemes are enabled. During import, PlanGrid still requests current
 metadata from the Uniandes course service. Fresh API metadata takes priority
 for current planning fields; embedded catalog metadata is preserved for details
 and used when the service is unavailable or no course is returned. A synthetic
@@ -95,7 +106,23 @@ are still unmet; the details drawer retains the full normalized rule and
 original API expression for reference. Plan options can mark homologated
 precalculus (`MATE-1201`/`MATE1`/`MATS1`) or the common Uniandes
 foreign-language aliases as already fulfilled. These recognitions are saved
-with the plan and exported in `.plan` format version 5.
+with the plan and exported in `.plan` format version 7.
+
+## Course Colors
+
+Course colors are generated from each course department hue and the first digit
+of the course number. Level `1` courses use the lightest bracket; levels `2`,
+`3`, and `4` step down to darker brackets. The same brightness rule applies
+even when a department or course color override changes the hue.
+
+Color exceptions live in `src/config/courseColorOverrides.json`. Each scheme
+has an `id`, display `name`, `enabled` flag, optional `departmentOverrides`,
+and optional `courseOverrides`. The JSON `enabled` flag defines the default
+selection for new or older plans; users can turn schemes on or off from the
+plan options `...` menu. Course-specific overrides take priority over
+department overrides. The included `Estudio Ingenieria de Sistemas` scheme
+sets `ISIS-1611` to `#6320ee`; the separate `Friendly MATE` scheme softens the
+`MATE` department color.
 
 Rebuild the static catalog index with:
 

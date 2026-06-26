@@ -1,6 +1,7 @@
 import type { StudyPlan } from "../models/studyPlan";
 import { createBlankPlan } from "./planFactory";
 import { normalizeSemesterCourses } from "./semesterLayout";
+import { defaultColorOverrideSchemeIds } from "../ui/courseColor";
 
 export const STORAGE_KEY = "plangrid.currentPlan.v1";
 
@@ -30,6 +31,9 @@ export function loadPlan(storage: Storage = localStorage): StudyPlan {
       recognizedRequirementIds: Array.isArray(parsed.recognizedRequirementIds)
         ? parsed.recognizedRequirementIds
         : [],
+      colorOverrideSchemeIds: Array.isArray(parsed.colorOverrideSchemeIds)
+        ? parsed.colorOverrideSchemeIds
+        : defaultColorOverrideSchemeIds,
       semesters: parsed.semesters.map((semester) => ({
         ...semester,
         courses: normalizeSemesterCourses(semester.courses),

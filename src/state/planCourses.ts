@@ -40,6 +40,35 @@ export function deleteCourse(plan: StudyPlan, courseId: string): StudyPlan {
   return removeCourse(plan, courseId).plan;
 }
 
+function updatePlannedCourse(
+  plan: StudyPlan,
+  courseId: string,
+  update: (course: PlannedCourse) => PlannedCourse,
+): StudyPlan {
+  return {
+    ...plan,
+    semesters: plan.semesters.map((semester) => ({
+      ...semester,
+      courses: semester.courses.map((course) =>
+        course.id === courseId ? update(course) : course,
+      ),
+    })),
+    storage: plan.storage.map((course) =>
+      course.id === courseId ? update(course) : course,
+    ),
+  };
+}
+
+export function toggleCourseCoursed(
+  plan: StudyPlan,
+  courseId: string,
+): StudyPlan {
+  return updatePlannedCourse(plan, courseId, (course) => ({
+    ...course,
+    coursed: !course.coursed,
+  }));
+}
+
 export function addCourse(
   plan: StudyPlan,
   course: Course,

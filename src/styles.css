@@ -209,9 +209,63 @@ button {
   background: rgba(185, 228, 168, 0.08);
 }
 
+.button--primary {
+  color: #14271c;
+  background: #b9e4a8;
+}
+
+.button--primary:hover,
+.button--primary:focus-visible {
+  outline: 2px solid rgba(185, 228, 168, 0.35);
+  outline-offset: 2px;
+}
+
 .button--danger {
   border-color: #72534b;
   color: #f2d6cf;
+}
+
+.language-modal {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(10, 23, 15, 0.62);
+  backdrop-filter: blur(2px);
+}
+
+.language-modal__panel {
+  display: grid;
+  width: min(430px, calc(100vw - 48px));
+  gap: 12px;
+  border: 1px solid #cad5c9;
+  border-radius: 12px;
+  padding: 22px;
+  color: #243329;
+  background: #fbfcfa;
+  box-shadow: 0 24px 70px rgba(12, 28, 18, 0.32);
+}
+
+.language-modal__panel h2 {
+  margin: 0;
+  font: 800 23px "Manrope", sans-serif;
+}
+
+.language-modal__panel p {
+  margin: 0;
+  color: #5f6d65;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.language-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 6px;
 }
 
 .sidebar {
@@ -345,6 +399,10 @@ button {
 .catalog-course:active,
 .course-card:active {
   cursor: grabbing;
+}
+
+.course-card[data-coursed="true"] {
+  opacity: 0.46;
 }
 
 .course-search {

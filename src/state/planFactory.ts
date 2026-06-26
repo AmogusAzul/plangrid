@@ -1,5 +1,6 @@
 import type { Course, PlannedCourse } from "../models/course";
 import type { PlanSemester, StudyPlan } from "../models/studyPlan";
+import { defaultColorOverrideSchemeIds } from "../ui/courseColor";
 
 export const DEFAULT_SEMESTER_COUNT = 8;
 export const DEFAULT_CREDIT_LIMIT = 21;
@@ -106,6 +107,7 @@ export function createBlankPlan(
     semesters: createSemesters(semesterCount),
     storage: [],
     recognizedRequirementIds: [],
+    colorOverrideSchemeIds: defaultColorOverrideSchemeIds,
   };
 }
 
