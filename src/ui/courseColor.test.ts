@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Course } from "../models/course";
+import colorOverrideConfig from "../config/courseColorOverrides.json";
 import { getCoursePalette } from "./courseColor";
 
 const course = (code: string): Course => ({
@@ -17,21 +18,21 @@ describe("getCoursePalette", () => {
   });
 
   it("maps the first course-code digit to descending lightness brackets", () => {
-    expect(getCoursePalette(course("ISIS-1221")).background).toMatch(/ 48%\)$/);
-    expect(getCoursePalette(course("ISIS-2221")).background).toMatch(/ 40%\)$/);
-    expect(getCoursePalette(course("ISIS-3221")).background).toMatch(/ 32%\)$/);
-    expect(getCoursePalette(course("ISIS-4221")).background).toMatch(/ 24%\)$/);
+    expect(getCoursePalette(course("CISO-1221")).background).toMatch(/ 48%\)$/);
+    expect(getCoursePalette(course("CISO-2221")).background).toMatch(/ 40%\)$/);
+    expect(getCoursePalette(course("CISO-3221")).background).toMatch(/ 32%\)$/);
+    expect(getCoursePalette(course("CISO-4221")).background).toMatch(/ 24%\)$/);
   });
 
-  it("uses the enabled ISIS plan course override while keeping level lightness", () => {
+  it("uses the raw color for an enabled course-specific override", () => {
     expect(getCoursePalette(course("ISIS-1611")).background).toBe(
-      "hsl(260 86% 48%)",
+      "#6320ee",
     );
   });
 
   it("can disable the ISIS plan course override", () => {
     expect(getCoursePalette(course("ISIS-1611"), []).background).not.toBe(
-      "hsl(260 86% 48%)",
+      "#6320ee",
     );
   });
 
@@ -53,5 +54,18 @@ describe("getCoursePalette", () => {
     expect(getCoursePalette(course("MATE-1203"), []).background).not.toEqual(
       getCoursePalette(course("MATE-1203")).background,
     );
+  });
+
+  it("resolves every configured course override from its scheme", () => {
+    for (const scheme of colorOverrideConfig.schemes) {
+      for (const [code, color] of Object.entries(
+        scheme.courseOverrides ?? {},
+      )) {
+        expect(
+          getCoursePalette(course(code), [scheme.id]).background,
+          `${scheme.id}:${code}`,
+        ).toBe(color);
+      }
+    }
   });
 });

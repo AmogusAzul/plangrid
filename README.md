@@ -112,8 +112,8 @@ with the plan and exported in `.plan` format version 7.
 
 Course colors are generated from each course department hue and the first digit
 of the course number. Level `1` courses use the lightest bracket; levels `2`,
-`3`, and `4` step down to darker brackets. The same brightness rule applies
-even when a department or course color override changes the hue.
+`3`, and `4` step down to darker brackets. Department overrides keep this
+brightness rule; course-specific overrides use their configured color exactly.
 
 Color exceptions live in `src/config/courseColorOverrides.json`. Each scheme
 has an `id`, display `name`, `enabled` flag, optional `departmentOverrides`,
@@ -123,6 +123,13 @@ plan options `...` menu. Course-specific overrides take priority over
 department overrides. The included `Estudio Ingenieria de Sistemas` scheme
 sets `ISIS-1611` to `#6320ee`; the separate `Friendly MATE` scheme softens the
 `MATE` department color.
+
+Department override hex values provide hue and saturation while the generated
+level bracket replaces their lightness. Course override hex values are rendered
+verbatim. A saved plan's menu selection takes precedence over a scheme's JSON
+`enabled` default, so confirm the scheme is checked under `...` > **Color
+overrides**. Changes to the source JSON appear immediately under `npm run dev`;
+rebuild with `npm run build` when serving `dist/`.
 
 Rebuild the static catalog index with:
 

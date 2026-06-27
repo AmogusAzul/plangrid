@@ -9,6 +9,11 @@ type ColorOverrideScheme = {
   courseOverrides?: Record<string, string>;
 };
 
+type ColorOverrideMatch = {
+  color: string;
+  scope: "course" | "department";
+};
+
 function hashText(value: string): number {
   let hash = 0;
 
@@ -96,7 +101,7 @@ function hexToHueSaturation(value: string): { hue: number; saturation: number } 
 function getOverrideColor(
   course: Course,
   enabledSchemeIds = defaultColorOverrideSchemeIds,
-): string | undefined {
+): ColorOverrideMatch | undefined {
   const enabledIds = new Set(enabledSchemeIds);
   const code = normalizeKey(course.code);
   const department = normalizeKey(
@@ -107,10 +112,12 @@ function getOverrideColor(
     if (!enabledIds.has(scheme.id)) continue;
 
     const courseOverride = scheme.courseOverrides?.[code];
-    if (courseOverride) return courseOverride;
+    if (courseOverride) return { color: courseOverride, scope: "course" };
 
     const departmentOverride = scheme.departmentOverrides?.[department];
-    if (departmentOverride) return departmentOverride;
+    if (departmentOverride) {
+      return { color: departmentOverride, scope: "department" };
+    }
   }
 
   return undefined;
@@ -122,9 +129,14 @@ export function getCoursePalette(
 ): CoursePalette {
   const department = course.department ?? course.code.split("-")[0] ?? "PLAN";
   const departmentHash = hashText(department);
-  const overrideColor = getOverrideColor(course, enabledSchemeIds);
-  const overrideHueSaturation = overrideColor
-    ? hexToHueSaturation(overrideColor)
+  const override = getOverrideColor(course, enabledSchemeIds);
+
+  if (override?.scope === "course") {
+    return { background: override.color };
+  }
+
+  const overrideHueSaturation = override
+    ? hexToHueSaturation(override.color)
     : null;
   const hue = overrideHueSaturation?.hue ?? departmentHash % 256;
   const saturation = overrideHueSaturation?.saturation ?? 68;

@@ -1,20 +1,63 @@
 {
-  "schemes": [
-    {
-      "id": "estudio-ingenieria-de-sistemas",
-      "name": "Estudio Ingenieria de Sistemas",
-      "enabled": true,
-      "courseOverrides": {
-        "ISIS-1611": "#6320ee"
-      }
-    },
-    {
-      "id": "friendly-mate",
-      "name": "Friendly MATE",
-      "enabled": true,
-      "departmentOverrides": {
-        "MATE": "#4f8f7a"
-      }
-    }
-  ]
+    "schemes": [
+        {
+            "id": "estudio-ingenieria-de-sistemas",
+            "name": "Estudio Ingenieria de Sistemas",
+            "enabled": true,
+            "courseOverrides": {
+                "ISIS-1221": "#3390ff",
+                "ISIS-1225": "#3390ff",
+                "ISIS-1226": "#3390ff",
+                "ISIS-2211": "#3390ff",
+                "ISIS-2212": "#3390ff",
+                "ISIS-2213": "#3390ff",
+                "ISIS-2214": "#3390ff",
+                "ISIS-2503": "#3390ff",
+                "ISIS-2603": "#3390ff",
+                "ISIS-3211": "#3390ff",
+                "ISIS-3510": "#3390ff",
+                "ISIS-3710": "#3390ff",
+
+                "ISIS-1611": "#6320ee",
+                "ISIS-2611": "#6320ee",
+
+                "ISIS-1304": "#5e304a",
+                "ISIS-1311": "#5e304a",
+                "ISIS-2311": "#5e304a",
+                "ISIS-3204": "#5e304a",
+                "ISIS-3311": "#5e304a",
+
+                "ISIS-1105": "#00ac6e",
+                "ISIS-1106": "#00ac6e",
+                "ISIS-1107": "#00ac6e",
+                "ISIS-2111": "#00ac6e",
+                "ISIS-2112": "#00ac6e",
+
+                "ISIS-1511": "#3e5b8e",
+                "ISIS-2304": "#3e5b8e",
+
+                "ISIS-2403": "#2cb12c",
+                "ISIS-2411": "#2cb12c",
+
+                "ISIS-1001": "#2d4052",
+                "ISIS-2007": "#2d4052",
+                "ISIS-2011": "#2d4052",
+                "ISIS-3007": "#2d4052",
+
+                "EPXX-0000": "#f45b69",
+
+                "IIND-2401": "#3e5b8e",
+                "ECXX-0000": "#3e5b8e",
+                "EING-0000": "#3e5b8e"
+            }
+        },
+        {
+            "id": "friendly-mate",
+            "name": "Friendly MATE",
+            "enabled": true,
+            "departmentOverrides": {
+                "MATE": "#4f8f7a"
+            }
+        }
+    ]
 }
