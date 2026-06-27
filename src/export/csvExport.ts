@@ -1,7 +1,11 @@
 import { getCourseByCode } from "../api/courseApi";
 import type { Course, PlannedCourse } from "../models/course";
 import type { StudyPlan } from "../models/studyPlan";
-import { createId, isRegularTerm } from "../state/planFactory";
+import {
+  createId,
+  isRegularTerm,
+  normalizePlanFilename,
+} from "../state/planFactory";
 import {
   hydrateCourses,
   type CourseLookup,
@@ -669,6 +673,7 @@ function plannedCourse(
 export async function importPlanFile(
   text: string,
   lookup: CourseLookup = getCourseByCode,
+  filename = "",
 ): Promise<ImportedPlan> {
   const parsed = parsePlanFile(text);
   const codes = [
@@ -697,6 +702,7 @@ export async function importPlanFile(
   );
   const plan: StudyPlan = {
     id: parsed.id ?? createId(),
+    filename: normalizePlanFilename(filename, parsed.name),
     name: parsed.name,
     createdAt: parsed.createdAt ?? now,
     updatedAt: now,

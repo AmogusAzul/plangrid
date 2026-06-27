@@ -6,6 +6,30 @@ export const DEFAULT_SEMESTER_COUNT = 8;
 export const DEFAULT_CREDIT_LIMIT = 21;
 export const DEFAULT_FIRST_TERM = "2026-20";
 
+export function getDefaultPlanFilename(planName: string): string {
+  const stem = planName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "plangrid-plan";
+
+  return `${stem}.plan`;
+}
+
+export function normalizePlanFilename(
+  filename: string,
+  planName: string,
+): string {
+  const leaf = filename.split(/[\\/]/).at(-1)?.trim() ?? "";
+  const safe = leaf
+    .replace(/[<>:"|?*\u0000-\u001f]/g, "-")
+    .replace(/[. ]+$/g, "");
+
+  if (!safe) return getDefaultPlanFilename(planName);
+  return safe.toLowerCase().endsWith(".plan") ? safe : `${safe}.plan`;
+}
+
 export function createId(): string {
   return globalThis.crypto?.randomUUID?.() ??
     `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -100,6 +124,7 @@ export function createBlankPlan(
 
   return {
     id: createId(),
+    filename: getDefaultPlanFilename("My PlanGrid"),
     name: "My PlanGrid",
     createdAt: now,
     updatedAt: now,

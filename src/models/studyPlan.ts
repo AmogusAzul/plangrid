@@ -10,6 +10,7 @@ export type PlanSemester = {
 
 export type StudyPlan = {
   id: string;
+  filename: string;
   name: string;
   createdAt: string;
   updatedAt: string;

@@ -1,141 +1,66 @@
 import { getCourseByCode } from "../api/courseApi";
-import type { Course, PlannedCourse } from "../models/course";
-import type { StudyPlan } from "../models/studyPlan";
-import { createId, isRegularTerm } from "../state/planFactory";
 import {
-  hydrateCourses,
-  type CourseLookup,
-} from "../state/courseHydration";
-import blankPresetData from "./blank-8-semesters.json";
-import isisPresetData from "./isis-2026-20-starter.json";
-import type { RecognizedRequirementId } from "../models/recognizedRequirement";
-import { defaultColorOverrideSchemeIds } from "../ui/courseColor";
+  importPlanFile,
+  parsePlanFile,
+  type ImportedPlan,
+} from "../export/csvExport";
+import { createId } from "../state/planFactory";
+import type { CourseLookup } from "../state/courseHydration";
 
 export type PlanPreset = {
   id: string;
+  filename: string;
   name: string;
-  description: string;
-  creditLimitPerSemester: number;
-  courses: Course[];
-  semesters: Array<{
-    label: string;
-    termHint: string;
-    courseCodes: string[];
-  }>;
-  storageCourseCodes: string[];
-  recognizedRequirementIds?: RecognizedRequirementId[];
+  semesterCount: number;
+  courseCount: number;
+  source: string;
 };
 
-export type LoadedPreset = {
-  plan: StudyPlan;
-  fallbackCodes: string[];
-};
+const presetSources = import.meta.glob("./*.plan", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+}) as Record<string, string>;
 
-function validatePreset(value: unknown): PlanPreset {
-  if (!value || typeof value !== "object") {
-    throw new Error("Preset data must be an object.");
+function presetFromFile(path: string, source: string): PlanPreset {
+  const filename = path.split("/").at(-1);
+  if (!filename) {
+    throw new Error(`Preset path has no filename: ${path}`);
   }
 
-  const preset = value as Partial<PlanPreset>;
-  const validSemesters =
-    Array.isArray(preset.semesters) &&
-    preset.semesters.length >= 1 &&
-    preset.semesters.length <= 16 &&
-    preset.semesters.every(
-      (semester) =>
-        typeof semester?.label === "string" &&
-        typeof semester.termHint === "string" &&
-        isRegularTerm(semester.termHint) &&
-        Array.isArray(semester.courseCodes) &&
-        semester.courseCodes.every((code) => typeof code === "string"),
-    );
-
-  if (
-    typeof preset.id !== "string" ||
-    typeof preset.name !== "string" ||
-    typeof preset.description !== "string" ||
-    !Number.isInteger(preset.creditLimitPerSemester) ||
-    preset.creditLimitPerSemester! < 1 ||
-    preset.creditLimitPerSemester! > 30 ||
-    !Array.isArray(preset.courses) ||
-    !preset.courses.every(
-      (course) =>
-        typeof course?.code === "string" &&
-        typeof course.name === "string" &&
-        typeof course.credits === "number" &&
-        Number.isFinite(course.credits) &&
-        course.credits >= 0 &&
-        (course.department === undefined ||
-          typeof course.department === "string"),
-    ) ||
-    !validSemesters ||
-    !Array.isArray(preset.storageCourseCodes) ||
-    !preset.storageCourseCodes.every((code) => typeof code === "string")
-  ) {
-    throw new Error("Preset data is invalid.");
-  }
-
-  return preset as PlanPreset;
-}
-
-export const planPresets: PlanPreset[] = [
-  validatePreset(blankPresetData),
-  validatePreset(isisPresetData),
-];
-
-function toPlannedCourse(
-  course: Course,
-  fallback: boolean,
-): PlannedCourse {
+  const parsed = parsePlanFile(source);
   return {
-    ...course,
-    id: createId(),
-    ...(fallback ? { metadataFallback: true } : {}),
+    id: filename,
+    filename,
+    name: parsed.name,
+    semesterCount: parsed.semesters.length,
+    courseCount:
+      parsed.semesters.reduce(
+        (total, semester) => total + semester.courses.length,
+        0,
+      ) + parsed.storageCourses.length,
+    source,
   };
 }
+
+export const planPresets = Object.entries(presetSources)
+  .map(([path, source]) => presetFromFile(path, source))
+  .sort((left, right) => left.filename.localeCompare(right.filename));
 
 export async function loadPlanPreset(
   preset: PlanPreset,
   lookup: CourseLookup = getCourseByCode,
-): Promise<LoadedPreset> {
-  const codes = [
-    ...preset.semesters.flatMap((semester) => semester.courseCodes),
-    ...preset.storageCourseCodes,
-  ].map((code) => code.trim().toUpperCase());
-  const uniqueCodes = [...new Set(codes)];
-  const hydrated = await hydrateCourses(
-    uniqueCodes,
-    preset.courses,
-    lookup,
-  );
-
-  const fallbackSet = new Set(hydrated.fallbackCodes);
+): Promise<ImportedPlan> {
+  const loaded = await importPlanFile(preset.source, lookup, preset.filename);
   const now = new Date().toISOString();
-  const courseFor = (code: string) => {
-    const normalizedCode = code.trim().toUpperCase();
-    return toPlannedCourse(
-      hydrated.courses.get(normalizedCode)!,
-      fallbackSet.has(normalizedCode),
-    );
-  };
 
   return {
+    ...loaded,
     plan: {
+      ...loaded.plan,
       id: createId(),
-      name: preset.name,
       createdAt: now,
       updatedAt: now,
-      creditLimitPerSemester: preset.creditLimitPerSemester,
-      semesters: preset.semesters.map((semester) => ({
-        id: createId(),
-        label: semester.label,
-        termHint: semester.termHint,
-        courses: semester.courseCodes.map(courseFor),
-      })),
-      storage: preset.storageCourseCodes.map(courseFor),
-      recognizedRequirementIds: preset.recognizedRequirementIds ?? [],
-      colorOverrideSchemeIds: defaultColorOverrideSchemeIds,
     },
-    fallbackCodes: hydrated.fallbackCodes,
   };
 }

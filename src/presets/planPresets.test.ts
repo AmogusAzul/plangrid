@@ -1,18 +1,51 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Course } from "../models/course";
+import type { StudyPlan } from "../models/studyPlan";
+import { serializePlanFile } from "../export/csvExport";
+import { createBlankPlan } from "../state/planFactory";
 import {
   loadPlanPreset,
   planPresets,
   type PlanPreset,
 } from "./planPresets";
 
+function presetFor(plan: StudyPlan, filename: string): PlanPreset {
+  const source = serializePlanFile(plan);
+  const courseCount =
+    plan.semesters.reduce(
+      (total, semester) => total + semester.courses.length,
+      0,
+    ) + plan.storage.length;
+
+  return {
+    id: filename,
+    filename,
+    name: plan.name,
+    semesterCount: plan.semesters.length,
+    courseCount,
+    source,
+  };
+}
+
 describe("plan presets", () => {
-  it("ships blank and ISIS starter presets from repository JSON", () => {
-    expect(planPresets.map((preset) => preset.id)).toEqual([
-      "blank-8-semesters",
-      "isis-2026-20-starter",
-    ]);
-    expect(planPresets[0].semesters).toHaveLength(8);
+  it("discovers repository .plan files and reads their internal names", () => {
+    expect(planPresets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          filename: "blank-8-semesters.plan",
+          name: "Blank 8-semester plan",
+          semesterCount: 8,
+        }),
+        expect.objectContaining({
+          filename: "isis-2026-10-precalculo-2026-06-26.plan",
+          name: "ISIS 2026-10 Precalculo",
+          semesterCount: 8,
+        }),
+      ]),
+    );
+    expect(
+      planPresets.every((preset) => preset.filename.endsWith(".plan")),
+    ).toBe(true);
   });
 
   it("loads a blank preset without course API calls", async () => {
@@ -21,6 +54,7 @@ describe("plan presets", () => {
     const loaded = await loadPlanPreset(planPresets[0], lookup);
 
     expect(lookup).not.toHaveBeenCalled();
+    expect(loaded.plan.filename).toBe("blank-8-semesters.plan");
     expect(loaded.plan.semesters).toHaveLength(8);
     expect(loaded.plan.semesters.every((semester) =>
       semester.courses.length === 0
@@ -34,21 +68,14 @@ describe("plan presets", () => {
       credits: 3,
       department: "ISIS",
     };
-    const preset: PlanPreset = {
-      id: "test",
-      name: "Test preset",
-      description: "Test",
-      creditLimitPerSemester: 21,
-      courses: [course],
-      semesters: [
-        {
-          label: "Semester 1",
-          termHint: "2026-20",
-          courseCodes: ["ISIS-1221", "ISIS-1221"],
-        },
-      ],
-      storageCourseCodes: ["ISIS-1221"],
-    };
+    const plan = createBlankPlan(1);
+    plan.name = "Test preset";
+    plan.semesters[0].courses.push(
+      { ...course, id: "first", slotStart: 1 },
+      { ...course, id: "second", slotStart: 4 },
+    );
+    plan.storage.push({ ...course, id: "stored" });
+    const preset = presetFor(plan, "test.plan");
     const lookup = vi.fn(async () => course);
 
     const loaded = await loadPlanPreset(preset, lookup);
@@ -61,7 +88,7 @@ describe("plan presets", () => {
     expect(new Set(plannedCourses.map((entry) => entry.id)).size).toBe(3);
   });
 
-  it("uses embedded preset metadata when the API fails", async () => {
+  it("uses embedded plan metadata when the API fails", async () => {
     const preset = planPresets[1];
     const loaded = await loadPlanPreset(preset, async () => {
       throw new Error("offline");
@@ -71,37 +98,17 @@ describe("plan presets", () => {
     expect(loaded.plan.semesters[0].courses[0]).toEqual(
       expect.objectContaining({
         code: "ISIS-1001",
-        name: "Introduccion a la Ingenieria de Sistemas",
+        name: "INTRODUCCION A LA INGENIERIA DE SISTEMAS",
         credits: 3,
       }),
     );
   });
 
-  it("marks unavailable course metadata for persistent warnings", async () => {
-    const preset: PlanPreset = {
-      id: "fallback",
-      name: "Fallback",
-      description: "Test",
-      creditLimitPerSemester: 21,
-      courses: [],
-      semesters: [
-        {
-          label: "Semester 1",
-          termHint: "2026-20",
-          courseCodes: ["UNKNOWN-1000"],
-        },
-      ],
-      storageCourseCodes: [],
-    };
+  it("creates a fresh plan identity each time a preset is loaded", async () => {
+    const first = await loadPlanPreset(planPresets[0], vi.fn());
+    const second = await loadPlanPreset(planPresets[0], vi.fn());
 
-    const loaded = await loadPlanPreset(preset, async () => null);
-
-    expect(loaded.fallbackCodes).toEqual(["UNKNOWN-1000"]);
-    expect(loaded.plan.semesters[0].courses[0]).toEqual(
-      expect.objectContaining({
-        credits: 3,
-        metadataFallback: true,
-      }),
-    );
+    expect(first.plan.id).not.toBe(second.plan.id);
+    expect(first.plan.name).toBe(planPresets[0].name);
   });
 });

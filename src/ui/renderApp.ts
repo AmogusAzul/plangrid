@@ -645,7 +645,7 @@ export function renderApp(
                   <article class="preset-card">
                     <div>
                       <strong>${escapeHtml(preset.name)}</strong>
-                      <p>${escapeHtml(preset.description)}</p>
+                      <p>${escapeHtml(preset.filename)}</p>
                     </div>
                     <button data-load-preset="${escapeHtml(preset.id)}">${escapeHtml(t("usePreset"))}</button>
                   </article>

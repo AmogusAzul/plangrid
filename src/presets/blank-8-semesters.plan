@@ -1,0 +1,41 @@
+[plan]
+format_version,7
+plan_id,blank-8-semesters
+plan_name,Blank 8-semester plan
+created_at,2026-06-26T00:00:00.000Z
+updated_at,2026-06-26T00:00:00.000Z
+credit_limit,21
+
+[recognized_requirements]
+id
+
+[color_overrides]
+scheme_id
+estudio-ingenieria-de-sistemas
+friendly-mate
+
+[courses]
+code,name,credits,department,metadata_fallback,metadata_source,availability,catalog_title,catalog_description,catalog_department_code,catalog_department_name,catalog_year,catalog_url
+
+[requirement_checks]
+code,status,term,checked_at,nrc,part_of_term
+
+[prerequisites]
+code,rule_index,code_expression,description_expression,normalized_expression
+
+[corequisites]
+code,required_code,title
+
+[semesters]
+semester,term,slot_1,slot_2,slot_3,slot_4,slot_5,slot_6,slot_7,slot_8,slot_9,slot_10,slot_11,slot_12,slot_13,slot_14,slot_15,slot_16,slot_17,slot_18,slot_19,slot_20,slot_21
+Semester 1,2026-20,,,,,,,,,,,,,,,,,,,,,
+Semester 2,2027-10,,,,,,,,,,,,,,,,,,,,,
+Semester 3,2027-20,,,,,,,,,,,,,,,,,,,,,
+Semester 4,2028-10,,,,,,,,,,,,,,,,,,,,,
+Semester 5,2028-20,,,,,,,,,,,,,,,,,,,,,
+Semester 6,2029-10,,,,,,,,,,,,,,,,,,,,,
+Semester 7,2029-20,,,,,,,,,,,,,,,,,,,,,
+Semester 8,2030-10,,,,,,,,,,,,,,,,,,,,,
+
+[storage]
+course_code,coursed

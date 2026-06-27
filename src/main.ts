@@ -114,7 +114,11 @@ function render(): void {
       exportPlanFile(plan);
     },
     async importPlan(file: File) {
-      const imported = await importPlanFile(await file.text());
+      const imported = await importPlanFile(
+        await file.text(),
+        undefined,
+        file.name,
+      );
       plan = savePlan(imported.plan);
       render();
       updatePlanMetadata();

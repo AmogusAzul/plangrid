@@ -2,6 +2,7 @@ import type { StudyPlan } from "../models/studyPlan";
 import { createBlankPlan } from "./planFactory";
 import { normalizeSemesterCourses } from "./semesterLayout";
 import { defaultColorOverrideSchemeIds } from "../ui/courseColor";
+import { normalizePlanFilename } from "./planFactory";
 
 export const STORAGE_KEY = "plangrid.currentPlan.v1";
 
@@ -28,6 +29,7 @@ export function loadPlan(storage: Storage = localStorage): StudyPlan {
 
     return {
       ...parsed,
+      filename: normalizePlanFilename(parsed.filename ?? "", parsed.name),
       recognizedRequirementIds: Array.isArray(parsed.recognizedRequirementIds)
         ? parsed.recognizedRequirementIds
         : [],

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   cascadeSemesterTerms,
   createBlankPlan,
+  getDefaultPlanFilename,
   nextRegularTerm,
+  normalizePlanFilename,
   resizeSemesters,
   updateSemesterTerm,
 } from "./planFactory";
@@ -14,6 +16,17 @@ describe("planFactory", () => {
     expect(plan.semesters).toHaveLength(8);
     expect(plan.semesters[0].termHint).toBe("2026-20");
     expect(plan.semesters[1].termHint).toBe("2027-10");
+    expect(plan.filename).toBe("my-plangrid.plan");
+  });
+
+  it("normalizes plan filenames independently from internal names", () => {
+    expect(getDefaultPlanFilename("Plan de Ingeniería")).toBe(
+      "plan-de-ingenieria.plan",
+    );
+    expect(normalizePlanFilename("draft", "Internal name")).toBe("draft.plan");
+    expect(normalizePlanFilename("", "Internal name")).toBe(
+      "internal-name.plan",
+    );
   });
 
   it("alternates regular terms", () => {

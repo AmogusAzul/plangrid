@@ -98,16 +98,17 @@ describe("plan file export", () => {
     ).toThrow("Missing required [storage] section");
   });
 
-  it("downloads the sectioned CSV using the .plan extension", () => {
+  it("downloads as the parsed internal name and current date", () => {
     const plan = createBlankPlan(1);
-    plan.name = "My Plan";
+    plan.name = "Mi Plan Físico!";
+    plan.filename = "degree-draft.plan";
     const download = vi.fn();
 
-    exportPlanFile(plan, new Date(2026, 5, 13), download);
+    exportPlanFile(plan, new Date(2026, 5, 26), download);
 
     expect(download).toHaveBeenCalledWith(
       expect.stringContaining("[semesters]"),
-      "my-plan-2026-06-13.plan",
+      "mi-plan-fisico-2026-06-26.plan",
       "text/csv;charset=utf-8",
     );
   });
@@ -133,9 +134,14 @@ describe("plan file import", () => {
     });
     const lookup = vi.fn(async (code: string) => catalog.get(code) ?? null);
 
-    const imported = await importPlanFile(serializePlanFile(plan), lookup);
+    const imported = await importPlanFile(
+      serializePlanFile(plan),
+      lookup,
+      "uploaded-degree.plan",
+    );
 
     expect(lookup).toHaveBeenCalledTimes(2);
+    expect(imported.plan.filename).toBe("uploaded-degree.plan");
     expect(lookup).toHaveBeenCalledWith("ISIS-1221");
     expect(lookup).toHaveBeenCalledWith("MATE-1203");
     expect(imported.plan.semesters[0].courses[0]).toEqual(

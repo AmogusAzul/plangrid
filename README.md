@@ -28,7 +28,7 @@ inside the application. The brand itself links back to this repository.
 - Advisory prerequisite/corequisite checks based on current `202620` offering details
 - Plan-level recognition for homologated precalculus and fulfilled language requirements
 - Browser autosave using `plangrid.currentPlan.v1`
-- Repository-backed blank and ISIS 2026-20 starter presets
+- Auto-discovered `.plan` presets, including blank and ISIS study plans
 - Import and export through sectioned CSV `.plan` files
 - Presentation-ready PNG export
 - Static deployment with GitHub Pages
@@ -78,6 +78,31 @@ for current planning fields; embedded catalog metadata is preserved for details
 and used when the service is unavailable or no course is returned. A synthetic
 three-credit card and visible warning are used only when neither source has
 metadata.
+
+Each loaded plan keeps two separate labels: its physical `.plan` filename and
+its internal `plan_name`. The internal name is shown as the editable plan title
+and in the preset menu. Importing captures the selected file's filename for
+reference. Exported files are named from the sanitized internal name and local
+date as `<name>-YYYY-MM-DD.plan`. Legacy browser saves without a filename
+receive one derived from their internal name.
+
+## Presets
+
+Presets are ordinary current-version `.plan` files in `src/presets/`. Vite
+discovers every `*.plan` file in that directory at build time, validates it
+with the normal plan parser, and uses its internal `plan_name` in the preset
+menu. The physical filename appears beneath the internal name.
+
+To add a preset:
+
+1. Create or import the plan in PlanGrid.
+2. Export it as a `.plan` file.
+3. Move the file into `src/presets/`.
+4. Run `npm test` and `npm run build`.
+
+No TypeScript registry, alternate JSON schema, or conversion command is
+required. Loading a preset clones its plan identity while retaining its
+filename, internal name, layout, metadata, and plan options.
 
 ## Catalog Search
 
@@ -137,12 +162,6 @@ Rebuild the static catalog index with:
 npm run build:catalog
 ```
 
-Turn an exported `.plan` file into a preset JSON draft with:
-
-```bash
-npm run plan:preset -- my-plan.plan src/presets/my-plan.json
-```
-
 The 2026 SmartCatalog page itself describes courses active during 2025; PlanGrid
 keeps the source version as `catalogYear: "2026"` because that is the catalog
 route and handoff target.
@@ -194,7 +213,8 @@ PlanGrid uses Vite, strict TypeScript, native DOM rendering, native drag and
 drop, Vitest, MiniSearch, and `html-to-image`. API responses are normalized
 behind `src/api/courseApi.ts`; catalog search lives behind lazy client-side
 search modules; plan validation, persistence, presets, and file serialization
-remain independent from the UI.
+remain independent from the UI. Presets reuse the same parser and hydration
+path as imported `.plan` files.
 
 ## Disclaimer
 

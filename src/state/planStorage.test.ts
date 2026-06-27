@@ -69,6 +69,9 @@ describe("planStorage", () => {
         }),
     } as unknown as Storage;
 
-    expect(loadPlan(storage).recognizedRequirementIds).toEqual([]);
+    const loaded = loadPlan(storage);
+
+    expect(loaded.recognizedRequirementIds).toEqual([]);
+    expect(loaded.filename).toBe("old-plan.plan");
   });
 });
